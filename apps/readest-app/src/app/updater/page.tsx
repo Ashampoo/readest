@@ -4,9 +4,14 @@ import { Suspense } from 'react';
 import { UpdaterContent } from '@/components/UpdaterWindow';
 import { useTheme } from '@/hooks/useTheme';
 import Spinner from '@/components/Spinner';
+import { UI_FEATURES } from '@/services/constants';
 
 const UpdaterPage = () => {
   useTheme();
+
+  if (!UI_FEATURES.updater) {
+    return null;
+  }
 
   return (
     <Suspense

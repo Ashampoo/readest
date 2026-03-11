@@ -355,7 +355,7 @@ export abstract class BaseAppService implements AppService {
         }
         ({ book: loadedBook, format } = await new DocumentLoader(fileobj).open());
         if (!loadedBook) {
-          throw new Error('Unsupported or corrupted book file');
+          throw new Error('Unsupported, protected, or corrupted book file');
         }
         const metadataTitle = formatTitle(loadedBook.metadata.title);
         if (!metadataTitle || !metadataTitle.trim() || metadataTitle === filename) {
@@ -466,22 +466,15 @@ export abstract class BaseAppService implements AppService {
   async deleteBook(book: Book, deleteAction: DeleteAction): Promise<void> {
     console.log('Deleting book with action:', deleteAction, book.title);
     if (deleteAction === 'local' || deleteAction === 'both') {
-      const localDeleteFps =
-        deleteAction === 'local'
-          ? [getLocalBookFilename(book)]
-          : [getLocalBookFilename(book), getCoverFilename(book)];
+      const localDeleteFps = [getLocalBookFilename(book), getCoverFilename(book)];
       for (const fp of localDeleteFps) {
         if (await this.fs.exists(fp, 'Books')) {
           await this.fs.removeFile(fp, 'Books');
         }
       }
-      if (deleteAction === 'local') {
-        book.downloadedAt = null;
-      } else {
-        book.deletedAt = Date.now();
-        book.downloadedAt = null;
-        book.coverDownloadedAt = null;
-      }
+      book.deletedAt = Date.now();
+      book.downloadedAt = null;
+      book.coverDownloadedAt = null;
     }
     if ((deleteAction === 'cloud' || deleteAction === 'both') && book.uploadedAt) {
       const fps = [getRemoteBookFilename(book), getCoverFilename(book)];

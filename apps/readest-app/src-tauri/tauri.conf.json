@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Readest",
-  "mainBinaryName": "readest",
-  "identifier": "com.bilingify.readest",
+  "productName": "Ashampoo E-Book Reader",
+  "mainBinaryName": "ashampoo_ebook",
+  "identifier": "com.ashampoo.ebookreader",
   "version": "../package.json",
   "build": {
     "frontendDist": "../out",
@@ -28,6 +28,7 @@
           "allow": [
             "$RESOURCE/**",
             "$APPDATA/**/*",
+            "$HOME/AppData/Roaming/Ashampoo/Ashampoo E-Book Reader/**/*",
             "$APPCACHE/**/*",
             "$TEMP/**/*",
             "**/Readest/**/*",

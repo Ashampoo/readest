@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
-import { checkForAppUpdates, checkAppReleaseNotes } from '@/helpers/updater';
 import { parseWebViewInfo } from '@/utils/ua';
 import { getAppVersion } from '@/utils/version';
 import SupportLinks from './SupportLinks';
@@ -20,12 +19,9 @@ export const setAboutDialogVisible = (visible: boolean) => {
   }
 };
 
-type UpdateStatus = 'checking' | 'updating' | 'updated' | 'error';
-
 export const AboutWindow = () => {
   const _ = useTranslation();
   const { appService } = useEnv();
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [browserInfo, setBrowserInfo] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
@@ -49,40 +45,15 @@ export const AboutWindow = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleCheckUpdate = async () => {
-    setUpdateStatus('checking');
-    try {
-      const hasUpdate = await checkForAppUpdates(_, false);
-      if (hasUpdate) {
-        handleClose();
-      } else {
-        setUpdateStatus('updated');
-      }
-    } catch (error) {
-      console.info('Error checking for updates:', error);
-      setUpdateStatus('error');
-    }
-  };
-
-  const handleShowRecentUpdates = async () => {
-    const hasNotes = await checkAppReleaseNotes(false);
-    if (hasNotes) {
-      handleClose();
-    } else {
-      setUpdateStatus('error');
-    }
-  };
-
   const handleClose = () => {
     setIsOpen(false);
-    setUpdateStatus(null);
   };
 
   return (
     <Dialog
       id='about_window'
       isOpen={isOpen}
-      title={_('About Readest')}
+      title={_('About Ashampoo E-Book Reader')}
       onClose={handleClose}
       boxClassName='sm:!w-[480px] sm:!max-w-screen-sm sm:h-auto'
     >
@@ -93,31 +64,10 @@ export const AboutWindow = () => {
               <Image src='/icon.png' alt='App Logo' className='h-20 w-20' width={64} height={64} />
             </div>
             <div className='flex select-text flex-col items-center'>
-              <h2 className='mb-2 text-2xl font-bold'>Readest</h2>
+              <h2 className='mb-2 text-2xl font-bold'>Ashampoo E-Book Reader</h2>
               <p className='text-neutral-content text-center text-sm'>
                 {_('Version {{version}}', { version: getAppVersion() })} {`(${browserInfo})`}
               </p>
-            </div>
-            <div className='my-1 h-5'>
-              {!updateStatus && (
-                <button
-                  className='badge badge-primary cursor-pointer p-2'
-                  onClick={appService?.hasUpdater ? handleCheckUpdate : handleShowRecentUpdates}
-                >
-                  {_('Check Update')}
-                </button>
-              )}
-              {updateStatus === 'updated' && (
-                <p className='text-neutral-content mt-2 text-xs'>
-                  {_('Already the latest version')}
-                </p>
-              )}
-              {updateStatus === 'checking' && (
-                <p className='text-neutral-content mt-2 text-xs'>{_('Checking for updates...')}</p>
-              )}
-              {updateStatus === 'error' && (
-                <p className='text-error mt-2 text-xs'>{_('Error checking for updates')}</p>
-              )}
             </div>
           </div>
 
@@ -128,23 +78,33 @@ export const AboutWindow = () => {
             dir='ltr'
           >
             <p className='text-neutral-content text-sm'>
-              © {new Date().getFullYear()} Bilingify LLC. All rights reserved.
+              Copyright (c) {new Date().getFullYear()} Ashampoo GmbH & Co. KG. All rights reserved.
             </p>
 
+            <p className='text-neutral-content text-xs'>{_('Credits: Readest (GNU AGPL v3).')}</p>
             <p className='text-neutral-content text-xs'>
-              This software is licensed under the{' '}
+              {_('This software includes Readest components and is licensed under the')}{' '}
               <Link
                 href='https://www.gnu.org/licenses/agpl-3.0.html'
                 className='text-blue-500 underline'
               >
                 GNU Affero General Public License v3.0
               </Link>
-              . You are free to use, modify, and distribute this software under the terms of the
-              AGPL v3 license. Please see the license for more details.
+              .{' '}
+              {_(
+                'You are free to use, modify, and distribute this software under the terms of the AGPL v3 license. Please see the license for more details.',
+              )}
             </p>
             <p className='text-neutral-content text-xs'>
-              Source code is available at{' '}
+              {_('Source code is available at')}{' '}
               <Link href='https://github.com/readest/readest' className='text-blue-500 underline'>
+                GitHub
+              </Link>
+              .
+            </p>
+            <p className='text-neutral-content text-xs'>
+              {_('Ashampoo source code is available at')}{' '}
+              <Link href='https://github.com/ashampoo/readest' className='text-blue-500 underline'>
                 GitHub
               </Link>
               .

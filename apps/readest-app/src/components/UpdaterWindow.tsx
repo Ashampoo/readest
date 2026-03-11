@@ -3,10 +3,7 @@ import semver from 'semver';
 import Image from 'next/image';
 import { useEnv } from '@/context/EnvContext';
 import { useEffect, useState } from 'react';
-import { type as osType, arch as osArch } from '@tauri-apps/plugin-os';
-import { check, Update } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import type { Update } from '@tauri-apps/plugin-updater';
 import { isTauriAppPlatform } from '@/services/environment';
 import { useTranslator } from '@/hooks/useTranslator';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -19,6 +16,33 @@ import { setLastShownReleaseNotesVersion } from '@/helpers/updater';
 import { READEST_UPDATER_FILE, READEST_CHANGELOG_FILE } from '@/services/constants';
 import Dialog from '@/components/Dialog';
 import Link from './Link';
+
+type TauriUpdaterDeps = {
+  osType: typeof import('@tauri-apps/plugin-os').type;
+  osArch: typeof import('@tauri-apps/plugin-os').arch;
+  check: typeof import('@tauri-apps/plugin-updater').check;
+  relaunch: typeof import('@tauri-apps/plugin-process').relaunch;
+  tauriFetch: typeof import('@tauri-apps/plugin-http').fetch;
+};
+
+let tauriDepsPromise: Promise<TauriUpdaterDeps> | null = null;
+const loadTauriDeps = () => {
+  if (!tauriDepsPromise) {
+    tauriDepsPromise = Promise.all([
+      import('@tauri-apps/plugin-os'),
+      import('@tauri-apps/plugin-updater'),
+      import('@tauri-apps/plugin-process'),
+      import('@tauri-apps/plugin-http'),
+    ]).then(([os, updater, process, http]) => ({
+      osType: os.type,
+      osArch: os.arch,
+      check: updater.check,
+      relaunch: process.relaunch,
+      tauriFetch: http.fetch,
+    }));
+  }
+  return tauriDepsPromise;
+};
 
 interface ReleaseNotes {
   releases: Record<
@@ -100,6 +124,7 @@ export const UpdaterContent = ({
 
   useEffect(() => {
     const checkDesktopUpdate = async () => {
+      const { check } = await loadTauriDeps();
       const update = await check();
       if (update) {
         setUpdate(update);
@@ -107,6 +132,7 @@ export const UpdaterContent = ({
     };
     const checkAndroidUpdate = async () => {
       if (!appService) return;
+      const { osArch, tauriFetch } = await loadTauriDeps();
       const fetch = isTauriAppPlatform() ? tauriFetch : window.fetch;
       const response = await fetch(READEST_UPDATER_FILE);
       const data = await response.json();
@@ -116,7 +142,7 @@ export const UpdaterContent = ({
         const arch = OS_ARCH === 'aarch64' ? 'arm64' : 'universal';
         const downloadUrl = data.platforms[platformKey]?.url as string;
         const apkFilePath = await appService.resolveFilePath(
-          `Readest_${data.version}_${arch}.apk`,
+          `Ashampoo_E-Book_Reader_${data.version}_${arch}.apk`,
           'Cache',
         );
         setUpdate({
@@ -168,6 +194,8 @@ export const UpdaterContent = ({
       }
     };
     const checkForUpdates = async () => {
+      if (!isTauriAppPlatform()) return;
+      const { osType } = await loadTauriDeps();
       const OS_TYPE = osType();
       if (['macos', 'windows', 'linux'].includes(OS_TYPE)) {
         checkDesktopUpdate();
@@ -202,7 +230,9 @@ export const UpdaterContent = ({
   useEffect(() => {
     const fetchChangelogs = async (fromVersion: string): Promise<Changelog[]> => {
       try {
-        const fetch = isTauriAppPlatform() ? tauriFetch : window.fetch;
+        const fetch = isTauriAppPlatform()
+          ? (await loadTauriDeps()).tauriFetch
+          : window.fetch;
         const res = await fetch(READEST_CHANGELOG_FILE);
         const data: ReleaseNotes = await res.json();
         const releases = data.releases;
@@ -294,7 +324,12 @@ export const UpdaterContent = ({
       }
     });
     console.log('package installed');
-    if (!appService?.isAndroidApp && process.env.NODE_ENV === 'production') {
+    if (
+      isTauriAppPlatform() &&
+      !appService?.isAndroidApp &&
+      process.env.NODE_ENV === 'production'
+    ) {
+      const { relaunch } = await loadTauriDeps();
       await relaunch();
     }
   };
@@ -314,13 +349,16 @@ export const UpdaterContent = ({
           {checkUpdate ? (
             <div className='text-base-content flex-grow text-sm'>
               <h2 className='mb-4 text-center font-bold sm:text-start'>
-                {_('A new version of Readest is available!')}
+                {_('A new version of Ashampoo E-Book Reader is available!')}
               </h2>
               <p className='mb-2'>
-                {_('Readest {{newVersion}} is available (installed version {{currentVersion}}).', {
-                  newVersion,
-                  currentVersion,
-                })}
+                {_(
+                  'Ashampoo E-Book Reader {{newVersion}} is available (installed version {{currentVersion}}).',
+                  {
+                    newVersion,
+                    currentVersion,
+                  },
+                )}
               </p>
               <p className='mb-2'>{_('Download and install now?')}</p>
 
@@ -481,7 +519,7 @@ export const UpdaterWindow = () => {
     <Dialog
       id='updater_window'
       isOpen={isOpen}
-      title={checkUpdate ? _('Software Update') : _("What's New in Readest")}
+      title={checkUpdate ? _('Software Update') : _("What's New in Ashampoo E-Book Reader")}
       onClose={() => setIsOpen(false)}
       boxClassName='sm:!w-[75%] sm:h-auto sm:!max-h-[85vh] sm:!max-w-2xl'
     >

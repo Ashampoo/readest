@@ -18,6 +18,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import {
   join,
   basename,
+  dataDir,
   appDataDir,
   appConfigDir,
   appCacheDir,
@@ -56,6 +57,13 @@ declare global {
 }
 
 const OS_TYPE = osType();
+const WINDOWS_APPDATA_VENDOR = 'Ashampoo';
+const WINDOWS_APPDATA_APP = 'Ashampoo E-Book Reader';
+
+const getWindowsAppDataRoot = async () => {
+  const root = await dataDir();
+  return await join(root, WINDOWS_APPDATA_VENDOR, WINDOWS_APPDATA_APP);
+};
 
 // Helper function to create a path resolver based on custom root directory and portable mode
 // 0. If no custom root dir and not portable mode, use default Tauri BaseDirectory
@@ -69,13 +77,17 @@ const getPathResolver = ({
   customRootDir,
   isPortable,
   execDir,
+  windowsAppDataRoot,
 }: {
   customRootDir?: string;
   isPortable?: boolean;
   execDir?: string;
+  windowsAppDataRoot?: string;
 } = {}) => {
   const customBaseDir = customRootDir ? 0 : undefined;
   const isCustomBaseDir = Boolean(customRootDir);
+  const useWindowsAppDataRoot =
+    OS_TYPE === 'windows' && Boolean(windowsAppDataRoot) && !customRootDir && !isPortable;
   const getCustomBasePrefixSync = isCustomBaseDir
     ? (baseDir: BaseDir) => {
         return () => {
@@ -85,20 +97,41 @@ const getPathResolver = ({
         };
       }
     : undefined;
+  const getWindowsBasePrefixSync = useWindowsAppDataRoot
+    ? (baseDir: BaseDir) => {
+        return () => {
+          const dataDirs = ['Data', 'Books', 'Fonts', 'Images'];
+          const leafDir = dataDirs.includes(baseDir) ? '' : baseDir;
+          return leafDir ? `${windowsAppDataRoot}/${leafDir}` : windowsAppDataRoot!;
+        };
+      }
+    : undefined;
 
   const getCustomBasePrefix = getCustomBasePrefixSync
     ? (baseDir: BaseDir) => async () => getCustomBasePrefixSync(baseDir)()
+    : undefined;
+  const getWindowsBasePrefix = getWindowsBasePrefixSync
+    ? (baseDir: BaseDir) => async () => getWindowsBasePrefixSync(baseDir)()
     : undefined;
 
   return (path: string, base: BaseDir): ResolvedPath => {
     const customBasePrefixSync = getCustomBasePrefixSync?.(base);
     const customBasePrefix = getCustomBasePrefix?.(base);
+    const windowsBasePrefixSync = getWindowsBasePrefixSync?.(base);
+    const windowsBasePrefix = getWindowsBasePrefix?.(base);
     switch (base) {
       case 'Settings':
         return {
-          baseDir: isPortable ? 0 : BaseDirectory.AppConfig,
-          basePrefix: isPortable && execDir ? async () => execDir : appConfigDir,
-          fp: isPortable && execDir ? `${execDir}${path ? `/${path}` : ''}` : path,
+          baseDir: isPortable || windowsBasePrefixSync ? 0 : BaseDirectory.AppConfig,
+          basePrefix:
+            isPortable && execDir
+              ? async () => execDir
+              : windowsBasePrefix ?? appConfigDir,
+          fp: isPortable && execDir
+            ? `${execDir}${path ? `/${path}` : ''}`
+            : windowsBasePrefixSync
+              ? `${windowsBasePrefixSync()}${path ? `/${path}` : ''}`
+              : path,
           base,
         };
       case 'Cache':
@@ -110,45 +143,57 @@ const getPathResolver = ({
         };
       case 'Log':
         return {
-          baseDir: isCustomBaseDir ? 0 : BaseDirectory.AppLog,
-          basePrefix: customBasePrefix ?? appLogDir,
-          fp: customBasePrefixSync ? `${customBasePrefixSync()}${path ? `/${path}` : ''}` : path,
+          baseDir: isCustomBaseDir || windowsBasePrefixSync ? 0 : BaseDirectory.AppLog,
+          basePrefix: customBasePrefix ?? windowsBasePrefix ?? appLogDir,
+          fp: customBasePrefixSync
+            ? `${customBasePrefixSync()}${path ? `/${path}` : ''}`
+            : windowsBasePrefixSync
+              ? `${windowsBasePrefixSync()}${path ? `/${path}` : ''}`
+              : path,
           base,
         };
       case 'Data':
         return {
-          baseDir: customBaseDir ?? BaseDirectory.AppData,
-          basePrefix: customBasePrefix ?? appDataDir,
+          baseDir: customBaseDir ?? (windowsBasePrefixSync ? 0 : BaseDirectory.AppData),
+          basePrefix: customBasePrefix ?? windowsBasePrefix ?? appDataDir,
           fp: customBasePrefixSync
             ? `${customBasePrefixSync()}/${DATA_SUBDIR}${path ? `/${path}` : ''}`
-            : `${DATA_SUBDIR}${path ? `/${path}` : ''}`,
+            : windowsBasePrefixSync
+              ? `${windowsBasePrefixSync()}/${DATA_SUBDIR}${path ? `/${path}` : ''}`
+              : `${DATA_SUBDIR}${path ? `/${path}` : ''}`,
           base,
         };
       case 'Books':
         return {
-          baseDir: customBaseDir ?? BaseDirectory.AppData,
-          basePrefix: customBasePrefix || appDataDir,
+          baseDir: customBaseDir ?? (windowsBasePrefixSync ? 0 : BaseDirectory.AppData),
+          basePrefix: customBasePrefix || windowsBasePrefix || appDataDir,
           fp: customBasePrefixSync
             ? `${customBasePrefixSync()}/${LOCAL_BOOKS_SUBDIR}${path ? `/${path}` : ''}`
-            : `${LOCAL_BOOKS_SUBDIR}${path ? `/${path}` : ''}`,
+            : windowsBasePrefixSync
+              ? `${windowsBasePrefixSync()}/${LOCAL_BOOKS_SUBDIR}${path ? `/${path}` : ''}`
+              : `${LOCAL_BOOKS_SUBDIR}${path ? `/${path}` : ''}`,
           base,
         };
       case 'Fonts':
         return {
-          baseDir: customBaseDir ?? BaseDirectory.AppData,
-          basePrefix: customBasePrefix || appDataDir,
+          baseDir: customBaseDir ?? (windowsBasePrefixSync ? 0 : BaseDirectory.AppData),
+          basePrefix: customBasePrefix || windowsBasePrefix || appDataDir,
           fp: customBasePrefixSync
             ? `${customBasePrefixSync()}/${LOCAL_FONTS_SUBDIR}${path ? `/${path}` : ''}`
-            : `${LOCAL_FONTS_SUBDIR}${path ? `/${path}` : ''}`,
+            : windowsBasePrefixSync
+              ? `${windowsBasePrefixSync()}/${LOCAL_FONTS_SUBDIR}${path ? `/${path}` : ''}`
+              : `${LOCAL_FONTS_SUBDIR}${path ? `/${path}` : ''}`,
           base,
         };
       case 'Images':
         return {
-          baseDir: customBaseDir ?? BaseDirectory.AppData,
-          basePrefix: customBasePrefix || appDataDir,
+          baseDir: customBaseDir ?? (windowsBasePrefixSync ? 0 : BaseDirectory.AppData),
+          basePrefix: customBasePrefix || windowsBasePrefix || appDataDir,
           fp: customBasePrefixSync
             ? `${customBasePrefixSync()}/${LOCAL_IMAGES_SUBDIR}${path ? `/${path}` : ''}`
-            : `${LOCAL_IMAGES_SUBDIR}${path ? `/${path}` : ''}`,
+            : windowsBasePrefixSync
+              ? `${windowsBasePrefixSync()}/${LOCAL_IMAGES_SUBDIR}${path ? `/${path}` : ''}`
+              : `${LOCAL_IMAGES_SUBDIR}${path ? `/${path}` : ''}`,
           base,
         };
       case 'None':
@@ -390,10 +435,21 @@ export class NativeAppService extends BaseAppService {
   override distChannel = DIST_CHANNEL;
 
   private execDir?: string = undefined;
+  private windowsAppDataRoot?: string = undefined;
 
   override async init() {
     const execDir = await invoke<string>('get_executable_dir');
     this.execDir = execDir;
+    if (OS_TYPE === 'windows') {
+      this.windowsAppDataRoot = await getWindowsAppDataRoot();
+      await this.migrateWindowsAppDataDir();
+    }
+    this.fs.resolvePath = getPathResolver({
+      customRootDir: undefined,
+      isPortable: this.isPortableApp,
+      execDir,
+      windowsAppDataRoot: this.windowsAppDataRoot,
+    });
     if (
       process.env['NEXT_PUBLIC_PORTABLE_APP'] ||
       (await this.fs.exists(`${execDir}/${SETTINGS_FILENAME}`, 'None'))
@@ -403,6 +459,7 @@ export class NativeAppService extends BaseAppService {
         customRootDir: execDir,
         isPortable: this.isPortableApp,
         execDir,
+        windowsAppDataRoot: this.windowsAppDataRoot,
       });
     }
     const settings = await this.loadSettings();
@@ -411,6 +468,7 @@ export class NativeAppService extends BaseAppService {
         customRootDir: settings.customRootDir,
         isPortable: this.isPortableApp,
         execDir,
+        windowsAppDataRoot: this.windowsAppDataRoot,
       });
     }
     await this.prepareBooksDir();
@@ -482,5 +540,60 @@ export class NativeAppService extends BaseAppService {
 
     const dirToDelete = await join(rootPath, 'Images', 'Readest');
     await this.deleteDir(dirToDelete, 'None', true);
+  }
+
+  private async migrateWindowsAppDataDir() {
+    if (OS_TYPE !== 'windows' || !this.windowsAppDataRoot) return;
+
+    const oldAppDataRoot = await appDataDir();
+    const oldAppConfigRoot = await appConfigDir();
+    const newRoot = this.windowsAppDataRoot;
+
+    if (oldAppDataRoot === newRoot || oldAppConfigRoot === newRoot) return;
+    if (await exists(newRoot)) return;
+    if (!(await exists(oldAppDataRoot)) && !(await exists(oldAppConfigRoot))) return;
+
+    const copyDirRecursive = async (src: string, dst: string) => {
+      if (!(await exists(dst))) {
+        await mkdir(dst, { recursive: true });
+      }
+      const entries = await readDir(src);
+      for (const entry of entries) {
+        const srcPath = await join(src, entry.name);
+        const dstPath = await join(dst, entry.name);
+        if (entry.isDirectory) {
+          await copyDirRecursive(srcPath, dstPath);
+        } else if (!(await exists(dstPath))) {
+          await copyFile(srcPath, dstPath);
+        }
+      }
+    };
+
+    let copied = false;
+    try {
+      if (await exists(oldAppDataRoot)) {
+        await copyDirRecursive(oldAppDataRoot, newRoot);
+      }
+      if (oldAppConfigRoot !== oldAppDataRoot && (await exists(oldAppConfigRoot))) {
+        await copyDirRecursive(oldAppConfigRoot, newRoot);
+      }
+      copied = true;
+    } catch (error) {
+      console.error('Failed to migrate Windows app data dir:', error);
+      copied = false;
+    }
+
+    if (!copied || !(await exists(newRoot))) return;
+
+    try {
+      if (await exists(oldAppDataRoot)) {
+        await remove(oldAppDataRoot, { recursive: true });
+      }
+      if (oldAppConfigRoot !== oldAppDataRoot && (await exists(oldAppConfigRoot))) {
+        await remove(oldAppConfigRoot, { recursive: true });
+      }
+    } catch (error) {
+      console.error('Failed to remove old Windows app data dir:', error);
+    }
   }
 }

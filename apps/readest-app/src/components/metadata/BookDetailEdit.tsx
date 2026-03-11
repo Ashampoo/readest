@@ -7,6 +7,7 @@ import { BookMetadata } from '@/libs/document';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { flattenContributors, formatAuthors, formatPublisher, formatTitle } from '@/utils/book';
+import { UI_FEATURES } from '@/services/constants';
 import { useFileSelector } from '@/hooks/useFileSelector';
 import { FormField } from './FormField';
 import BookCover from '@/components/BookCover';
@@ -302,23 +303,30 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
       {/* Action Buttons */}
       <div className='flex flex-col items-center justify-between gap-4'>
         <div className='flex w-full items-center gap-2'>
-          <button
-            onClick={onAutoRetrieve}
-            disabled={searchLoading}
-            className='flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600 disabled:opacity-50'
-            title={_('Auto-Retrieve Metadata')}
-          >
-            {searchLoading ? (
-              <span className='loading loading-spinner h-4 w-4'></span>
-            ) : (
-              <MdOutlineSearch className='mt-[1px] h-4 w-4' />
-            )}
-            <span className='sm:hidden'>{_('Auto')}</span>
-            <span className='hidden sm:inline'>{_('Auto-Retrieve')}</span>
-          </button>
+          {UI_FEATURES.metadataAutoRetrieve && (
+            <button
+              onClick={onAutoRetrieve}
+              disabled={searchLoading}
+              className='flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600 disabled:opacity-50'
+              title={_('Auto-Retrieve Metadata')}
+            >
+              {searchLoading ? (
+                <span className='loading loading-spinner h-4 w-4'></span>
+              ) : (
+                <MdOutlineSearch className='mt-[1px] h-4 w-4' />
+              )}
+              <span className='sm:hidden'>{_('Auto')}</span>
+              <span className='hidden sm:inline'>{_('Auto-Retrieve')}</span>
+            </button>
+          )}
 
           {/* Lock/Unlock All Buttons */}
-          <div className='flex items-center gap-1 border-l border-gray-300 pl-2'>
+          <div
+            className={clsx(
+              'flex items-center gap-1 pl-2',
+              UI_FEATURES.metadataAutoRetrieve && 'border-l border-gray-300',
+            )}
+          >
             <button
               onClick={onUnlockAll}
               disabled={!hasLockedFields}

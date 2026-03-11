@@ -61,14 +61,14 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   openBookInNewWindow: true,
   alwaysShowStatusBar: false,
   alwaysInForeground: false,
-  autoCheckUpdates: true,
+  autoCheckUpdates: false,
   screenWakeLock: false,
   screenBrightness: -1, // -1~100, -1 for system default
   autoScreenBrightness: true,
   openLastBooks: false,
   lastOpenBooks: [],
   autoImportBooksOnOpen: false,
-  telemetryEnabled: true,
+  telemetryEnabled: false,
   libraryViewMode: 'grid',
   librarySortBy: 'updated',
   librarySortAscending: false,
@@ -244,6 +244,18 @@ export const DEFAULT_TRANSLATOR_CONFIG: TranslatorConfig = {
   translateTargetLang: '',
   showTranslateSource: true,
   ttsReadAloudText: 'both',
+};
+
+export const UI_FEATURES = {
+  translation: false,
+  auth: false,
+  telemetry: false,
+  metadataAutoRetrieve: false,
+  kosync: false,
+  updater: false,
+  opds: false,
+  dictionary: false,
+  wikipedia: false,
 };
 
 export const DEFAULT_ANNOTATOR_CONFIG: AnnotatorConfig = {

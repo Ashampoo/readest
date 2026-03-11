@@ -71,6 +71,12 @@
           "path": "**/Readest/**/*"
         },
         {
+          "path": "**/Ashampoo/Ashampoo E-Book Reader"
+        },
+        {
+          "path": "**/Ashampoo/Ashampoo E-Book Reader/**/*"
+        },
+        {
           "path": "**/last-book-cover.png"
         }
       ]

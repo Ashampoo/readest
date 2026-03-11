@@ -6,6 +6,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { getAccessToken } from '@/utils/access';
 import { StripeProductMetadata } from '@/types/payment';
 import { AvailablePlan, PlanType } from '@/types/quota';
+import { UI_FEATURES } from '@/services/constants';
 
 let stripePromise: Promise<StripeClient | null>;
 
@@ -116,7 +117,9 @@ export const redirectToStripePortal = async (url: string): Promise<void> => {
 
 export const handleStripeCheckoutError = (error: string) => {
   console.error(error);
-  posthog.capture('checkout_error', { error });
+  if (UI_FEATURES.telemetry) {
+    posthog.capture('checkout_error', { error });
+  }
 };
 
 export const getSubscriptionSuccessUrl = (sessionId: string) => {

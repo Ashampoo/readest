@@ -19,7 +19,6 @@ import { transferManager } from '@/services/transferManager';
 import { getDirPath, getFilename, joinPaths } from '@/utils/path';
 import { parseOpenWithFiles } from '@/helpers/openWith';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { checkForAppUpdates, checkAppReleaseNotes } from '@/helpers/updater';
 import { impactFeedback } from '@tauri-apps/plugin-haptics';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 
@@ -27,6 +26,7 @@ import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { UI_FEATURES } from '@/services/constants';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
@@ -52,7 +52,6 @@ import {
 import { BookMetadata } from '@/libs/document';
 import { AboutWindow } from '@/components/AboutWindow';
 import { BookDetailModal } from '@/components/metadata';
-import { UpdaterWindow } from '@/components/UpdaterWindow';
 import { CatalogDialog } from './components/OPDSDialog';
 import { MigrateDataWindow } from './components/MigrateDataWindow';
 import { useDragDropImport } from './hooks/useDragDropImport';
@@ -159,19 +158,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   }, [searchParams]);
 
   useEffect(() => {
-    const doCheckAppUpdates = async () => {
-      if (appService?.hasUpdater && settings.autoCheckUpdates) {
-        await checkForAppUpdates(_);
-      } else if (appService?.hasUpdater === false) {
-        checkAppReleaseNotes();
-      }
-    };
     if (settings.alwaysOnTop) {
       tauriHandleSetAlwaysOnTop(settings.alwaysOnTop);
     }
-    doCheckAppUpdates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appService?.hasUpdater, settings]);
+  }, [settings]);
 
   useEffect(() => {
     if (appService?.isMobileApp) {
@@ -354,7 +345,9 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       return false;
     };
 
-    initLogin();
+    if (UI_FEATURES.auth) {
+      initLogin();
+    }
     initLibrary();
     return () => {
       setCheckOpenWithBooks(false);
@@ -398,7 +391,8 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       ['Unsupported format', _('This book format is not supported')],
       ['Failed to open file', _('Failed to open the book file')],
       ['Invalid or empty book file', _('The book file is empty')],
-      ['Unsupported or corrupted book file', _('The book file is corrupted')],
+      ['Unsupported or corrupted book file', _('This book format is not supported or is protected by DRM')],
+      ['Unsupported, protected, or corrupted book file', _('This book format is not supported or is protected by DRM')],
     ];
 
     const processFile = async (selectedFile: SelectedFile) => {
@@ -551,12 +545,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       const deletionMessages = {
         both: _('Book deleted: {{title}}', { title: book.title }),
         cloud: _('Deleted cloud backup of the book: {{title}}', { title: book.title }),
-        local: _('Deleted local copy of the book: {{title}}', { title: book.title }),
+        local: _('Book deleted: {{title}}', { title: book.title }),
       };
       const deletionFailMessages = {
         both: _('Failed to delete book: {{title}}', { title: book.title }),
         cloud: _('Failed to delete cloud backup of the book: {{title}}', { title: book.title }),
-        local: _('Failed to delete local copy of the book: {{title}}', { title: book.title }),
+        local: _('Failed to delete book: {{title}}', { title: book.title }),
       };
       try {
         await appService?.deleteBook(book, deleteAction);
@@ -810,7 +804,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
                 handleImportBooks={handleImportBooksFromFiles}
                 handleBookUpload={handleBookUpload}
                 handleBookDownload={handleBookDownload}
-                handleBookDelete={handleBookDelete('both')}
+                handleBookDelete={handleBookDelete('local')}
                 handleSetSelectMode={handleSetSelectMode}
                 handleShowDetailsBook={handleShowDetailsBook}
                 booksTransferProgress={booksTransferProgress}
@@ -843,14 +837,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           onClose={() => setShowDetailsBook(null)}
           handleBookUpload={handleBookUpload}
           handleBookDownload={handleBookDownload}
-          handleBookDelete={handleBookDelete('both')}
-          handleBookDeleteCloudBackup={handleBookDelete('cloud')}
-          handleBookDeleteLocalCopy={handleBookDelete('local')}
+          handleBookDelete={handleBookDelete('local')}
           handleBookMetadataUpdate={handleUpdateMetadata}
         />
       )}
       <AboutWindow />
-      <UpdaterWindow />
       <MigrateDataWindow />
       {isSettingsDialogOpen && <SettingsDialog bookKey={''} />}
       {showCatalogManager && <CatalogDialog onClose={handleDismissOPDSDialog} />}

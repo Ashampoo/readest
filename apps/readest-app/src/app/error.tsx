@@ -6,6 +6,7 @@ import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { parseWebViewInfo } from '@/utils/ua';
 import { handleGlobalError } from '@/utils/error';
+import { UI_FEATURES } from '@/services/constants';
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
@@ -22,7 +23,9 @@ export default function Error({ error, reset }: ErrorPageProps) {
   }, [appService]);
 
   useEffect(() => {
-    posthog.captureException(error);
+    if (UI_FEATURES.telemetry) {
+      posthog.captureException(error);
+    }
     handleGlobalError(error);
   }, [appService, error]);
 

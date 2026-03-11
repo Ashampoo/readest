@@ -10,7 +10,7 @@ import { IoMdExpand } from 'react-icons/io';
 import { TbArrowAutofitWidth } from 'react-icons/tb';
 import { TbColumns1, TbColumns2 } from 'react-icons/tb';
 
-import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL, ZOOM_STEP } from '@/services/constants';
+import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL, ZOOM_STEP, UI_FEATURES } from '@/services/constants';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useThemeStore } from '@/store/themeStore';
@@ -76,6 +76,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
   };
 
   const handleSync = () => {
+    if (!UI_FEATURES.auth) return;
     if (!user) {
       navigateToLogin(router);
       setIsDropdownOpen?.(false);
@@ -263,22 +264,26 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
-      <MenuItem
-        label={
-          !user
-            ? _('Sign in to Sync')
-            : lastSyncTime
-              ? _('Synced at {{time}}', {
-                  time: new Date(lastSyncTime).toLocaleString(),
-                })
-              : _('Never synced')
-        }
-        Icon={user ? MdSync : MdSyncProblem}
-        iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
-        onClick={handleSync}
-      />
+      {UI_FEATURES.auth && (
+        <>
+          <MenuItem
+            label={
+              !user
+                ? _('Sign in to Sync')
+                : lastSyncTime
+                  ? _('Synced at {{time}}', {
+                      time: new Date(lastSyncTime).toLocaleString(),
+                    })
+                  : _('Never synced')
+            }
+            Icon={user ? MdSync : MdSyncProblem}
+            iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
+            onClick={handleSync}
+          />
 
-      <hr aria-hidden='true' className='border-base-300 my-1' />
+          <hr aria-hidden='true' className='border-base-300 my-1' />
+        </>
+      )}
 
       {appService?.hasWindow && <MenuItem label={_('Fullscreen')} onClick={handleFullScreen} />}
       <MenuItem

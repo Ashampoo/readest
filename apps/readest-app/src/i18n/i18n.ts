@@ -30,7 +30,7 @@ const initI18n = async () => {
       defaultNS: options.defaultNs,
       ...(isBrowser && {
         backend: {
-          loadPath: '/locales/{{lng}}/{{ns}}.json',
+          loadPath: '/locales/{{lng}}.json',
         },
       }),
       detection: {

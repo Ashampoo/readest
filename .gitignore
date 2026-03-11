@@ -45,3 +45,11 @@ fastlane/report.xml
 
 # nix
 result*
+scripts/clean-caches.ps1
+*.toml
+/.github
+/.idea
+/_inbox
+build.md
+docs/UPDATE.txt
+installer/readest.iss

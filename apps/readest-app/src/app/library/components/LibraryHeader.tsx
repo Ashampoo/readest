@@ -168,8 +168,8 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
             {isMobile ? null : (
               <button
                 onClick={onToggleSelectMode}
-                aria-label={_('Select Books')}
-                title={_('Select Books')}
+                aria-label={_('Select multiple books')}
+                title={_('Select multiple books')}
                 className='h-6'
               >
                 {isSelectMode ? (

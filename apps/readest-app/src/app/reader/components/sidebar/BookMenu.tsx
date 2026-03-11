@@ -12,7 +12,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useParallelViewStore } from '@/store/parallelViewStore';
 import { isWebAppPlatform } from '@/services/environment';
 import { eventDispatcher } from '@/utils/event';
-import { DOWNLOAD_READEST_URL } from '@/services/constants';
+import { DOWNLOAD_READEST_URL, UI_FEATURES } from '@/services/constants';
 import { setKOSyncSettingsWindowVisible } from '@/app/reader/components/KOSyncSettings';
 import { setProofreadRulesVisibility } from '@/app/reader/components/ProofreadRules';
 import { FIXED_LAYOUT_FORMATS } from '@/types/book';
@@ -143,12 +143,16 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
         ) : (
           <MenuItem label={_('Enter Parallel Read')} onClick={handleSetParallel} />
         ))}
-      <hr className='border-base-200 my-1' />
-      <MenuItem label={_('KOReader Sync')} onClick={showKoSyncSettingsWindow} />
-      {settings.kosync.enabled && (
+      {UI_FEATURES.kosync && (
         <>
-          <MenuItem label={_('Push Progress')} onClick={handlePushKOSync} />
-          <MenuItem label={_('Pull Progress')} onClick={handlePullKOSync} />
+          <hr className='border-base-200 my-1' />
+          <MenuItem label={_('KOReader Sync')} onClick={showKoSyncSettingsWindow} />
+          {settings.kosync.enabled && (
+            <>
+              <MenuItem label={_('Push Progress')} onClick={handlePushKOSync} />
+              <MenuItem label={_('Pull Progress')} onClick={handlePullKOSync} />
+            </>
+          )}
         </>
       )}
       <hr className='border-base-200 my-1' />
@@ -162,8 +166,10 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
       />
       <MenuItem label={_('Reload Page')} shortcut='Shift+R' onClick={handleReloadPage} />
       <hr className='border-base-200 my-1' />
-      {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />}
-      <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
+      {isWebAppPlatform() && (
+        <MenuItem label={_('Download Ashampoo E-Book Reader')} onClick={downloadReadest} />
+      )}
+      <MenuItem label={_('About Ashampoo E-Book Reader')} onClick={showAboutReadest} />
     </Menu>
   );
 };

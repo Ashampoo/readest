@@ -10,6 +10,7 @@ import { FaHeadphones } from 'react-icons/fa6';
 import { IoIosBuild } from 'react-icons/io';
 import { AnnotationToolType } from '@/types/annotator';
 import { stubTranslation as _ } from '@/utils/misc';
+import { UI_FEATURES } from '@/services/constants';
 
 type AnnotationToolButton = {
   type: AnnotationToolType;
@@ -57,27 +58,39 @@ export const annotationToolButtons = createAnnotationToolButtons([
     Icon: FiSearch,
     quickAction: true,
   },
-  {
-    type: 'dictionary',
-    label: _('Dictionary'),
-    tooltip: _('Look up text in dictionary after selection'),
-    Icon: TbHexagonLetterD,
-    quickAction: true,
-  },
-  {
-    type: 'wikipedia',
-    label: _('Wikipedia'),
-    tooltip: _('Look up text in Wikipedia after selection'),
-    Icon: FaWikipediaW,
-    quickAction: true,
-  },
-  {
-    type: 'translate',
-    label: _('Translate'),
-    tooltip: _('Translate text after selection'),
-    Icon: BsTranslate,
-    quickAction: true,
-  },
+  ...(UI_FEATURES.dictionary
+    ? [
+        {
+          type: 'dictionary',
+          label: _('Dictionary'),
+          tooltip: _('Look up text in dictionary after selection'),
+          Icon: TbHexagonLetterD,
+          quickAction: true,
+        } as const,
+      ]
+    : []),
+  ...(UI_FEATURES.wikipedia
+    ? [
+        {
+          type: 'wikipedia',
+          label: _('Wikipedia'),
+          tooltip: _('Look up text in Wikipedia after selection'),
+          Icon: FaWikipediaW,
+          quickAction: true,
+        } as const,
+      ]
+    : []),
+  ...(UI_FEATURES.translation
+    ? [
+        {
+          type: 'translate',
+          label: _('Translate'),
+          tooltip: _('Translate text after selection'),
+          Icon: BsTranslate,
+          quickAction: true,
+        } as const,
+      ]
+    : []),
   {
     type: 'tts',
     label: _('Speak'),

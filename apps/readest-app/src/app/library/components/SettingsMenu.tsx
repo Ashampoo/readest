@@ -8,7 +8,7 @@ import { MdCloudSync } from 'react-icons/md';
 
 import { invoke, PermissionState } from '@tauri-apps/api/core';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { DOWNLOAD_READEST_URL } from '@/services/constants';
+import { DOWNLOAD_READEST_URL, UI_FEATURES } from '@/services/constants';
 import { useAuth } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
@@ -65,6 +65,15 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
 
   const { stats, hasActiveTransfers, setIsTransferQueueOpen } = useTransferQueue();
 
+  React.useEffect(() => {
+    if (!UI_FEATURES.telemetry && isTelemetryEnabled) {
+      saveSysSettings(envConfig, 'telemetryEnabled', false);
+      optOutTelemetry();
+      setIsTelemetryEnabled(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envConfig, isTelemetryEnabled]);
+
   const openTransferQueue = () => {
     setIsTransferQueueOpen(true);
     setIsDropdownOpen?.(false);
@@ -81,11 +90,13 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
   };
 
   const handleUserLogin = () => {
+    if (!UI_FEATURES.auth) return;
     navigateToLogin(router);
     setIsDropdownOpen?.(false);
   };
 
   const handleUserProfile = () => {
+    if (!UI_FEATURES.auth) return;
     navigateToProfile(router);
     setIsDropdownOpen?.(false);
   };
@@ -125,6 +136,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
   };
 
   const toggleAutoUploadBooks = () => {
+    if (!UI_FEATURES.auth) return;
     const newValue = !settings.autoUpload;
     saveSysSettings(envConfig, 'autoUpload', newValue);
     setIsAutoUpload(newValue);
@@ -170,6 +182,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
   };
 
   const handleUpgrade = () => {
+    if (!UI_FEATURES.auth) return;
     navigateToProfile(router);
     setIsDropdownOpen?.(false);
   };
@@ -237,34 +250,42 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
       )}
       onCancel={() => setIsDropdownOpen?.(false)}
     >
-      {user ? (
+      {UI_FEATURES.auth &&
+        (user ? (
+          <MenuItem
+            label={
+              userDisplayName
+                ? _('Logged in as {{userDisplayName}}', { userDisplayName })
+                : _('Logged in')
+            }
+            labelClass='!max-w-40'
+            aria-label={_('View account details and quota')}
+            Icon={
+              avatarUrl ? (
+                <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={PiUserCircleCheck} />
+              ) : (
+                PiUserCircleCheck
+              )
+            }
+          >
+            <ul className='flex flex-col'>
+              <button onClick={handleUserProfile} className='w-full'>
+                <Quota quotas={quotas} labelClassName='h-10 pl-3 pr-2' />
+              </button>
+              <MenuItem label={_('Account')} noIcon onClick={handleUserProfile} />
+            </ul>
+          </MenuItem>
+        ) : (
+          <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin} />
+        ))}
+      {UI_FEATURES.auth && (
         <MenuItem
-          label={
-            userDisplayName
-              ? _('Logged in as {{userDisplayName}}', { userDisplayName })
-              : _('Logged in')
-          }
-          labelClass='!max-w-40'
-          aria-label={_('View account details and quota')}
-          Icon={
-            avatarUrl ? (
-              <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={PiUserCircleCheck} />
-            ) : (
-              PiUserCircleCheck
-            )
-          }
-        >
-          <ul className='flex flex-col'>
-            <button onClick={handleUserProfile} className='w-full'>
-              <Quota quotas={quotas} labelClassName='h-10 pl-3 pr-2' />
-            </button>
-            <MenuItem label={_('Account')} noIcon onClick={handleUserProfile} />
-          </ul>
-        </MenuItem>
-      ) : (
-        <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
+          label={_('Auto Upload Books to Cloud')}
+          toggled={isAutoUpload}
+          onClick={toggleAutoUploadBooks}
+        />
       )}
-      {user && (
+      {UI_FEATURES.auth && user && (
         <MenuItem
           label={_('Cloud File Transfers')}
           Icon={MdCloudSync}
@@ -281,11 +302,13 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
           onClick={openTransferQueue}
         />
       )}
-      <MenuItem
+      {UI_FEATURES.auth && user && (
+        <MenuItem
         label={_('Auto Upload Books to Cloud')}
         toggled={isAutoUpload}
         onClick={toggleAutoUploadBooks}
       />
+      )}
       {isTauriAppPlatform() && !appService?.isMobile && (
         <MenuItem
           label={_('Auto Import on File Open')}
@@ -300,7 +323,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
           onClick={toggleOpenLastBooks}
         />
       )}
-      {appService?.hasUpdater && (
+      {UI_FEATURES.updater && appService?.hasUpdater && (
         <MenuItem
           label={_('Check Updates on Start')}
           toggled={isAutoCheckUpdates}
@@ -369,17 +392,21 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
         </>
       )}
       <hr aria-hidden='true' className='border-base-200 my-1' />
-      {user && userProfilePlan === 'free' && (
-        <MenuItem label={_('Upgrade to Readest Premium')} onClick={handleUpgrade} />
+      {UI_FEATURES.auth && user && userProfilePlan === 'free' && (
+        <MenuItem label={_('Upgrade to Ashampoo E-Book Reader Premium')} onClick={handleUpgrade} />
       )}
-      {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />}
-      <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
-      <MenuItem
-        label={_('Help improve Readest')}
-        description={isTelemetryEnabled ? _('Sharing anonymized statistics') : ''}
-        toggled={isTelemetryEnabled}
-        onClick={toggleTelemetry}
-      />
+      {isWebAppPlatform() && (
+        <MenuItem label={_('Download Ashampoo E-Book Reader')} onClick={downloadReadest} />
+      )}
+      <MenuItem label={_('About Ashampoo E-Book Reader')} onClick={showAboutReadest} />
+      {UI_FEATURES.telemetry && (
+        <MenuItem
+          label={_('Help improve Ashampoo E-Book Reader')}
+          description={isTelemetryEnabled ? _('Sharing anonymized statistics') : ''}
+          toggled={isTelemetryEnabled}
+          onClick={toggleTelemetry}
+        />
+      )}
     </Menu>
   );
 };

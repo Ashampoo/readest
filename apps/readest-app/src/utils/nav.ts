@@ -1,5 +1,6 @@
 import { useRouter, redirect } from 'next/navigation';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { isPWA, isWebAppPlatform } from '@/services/environment';
 import { BOOK_IDS_SEPARATOR } from '@/services/constants';
@@ -10,28 +11,36 @@ const createReaderWindow = (appService: AppService, url: string) => {
   const currentWindow = getCurrentWindow();
   const label = currentWindow.label;
   const newLabelPrefix = label === 'main' ? 'reader' : label;
-  const win = new WebviewWindow(`${newLabelPrefix}-${readerWindowsCount}`, {
-    url,
-    width: 800,
-    height: 600,
-    center: true,
-    resizable: true,
-    title: appService.isMacOSApp ? '' : 'Readest',
-    decorations: appService.isMacOSApp ? true : false,
-    transparent: appService.isMacOSApp ? false : true,
-    shadow: appService.isMacOSApp ? undefined : true,
-    titleBarStyle: appService.isMacOSApp ? 'overlay' : undefined,
-  });
-  win.once('tauri://created', () => {
-    console.log('new window created');
-    readerWindowsCount += 1;
-  });
-  win.once('tauri://error', (e) => {
-    console.error('error creating window', e);
-  });
-  win.once('tauri://destroyed', () => {
-    readerWindowsCount -= 1;
-  });
+  const windowLabel = `${newLabelPrefix}-${readerWindowsCount}`;
+  const isReader = url.startsWith('/reader');
+  if (appService.hasWindow && isReader) {
+    invoke('open_reader_window', { label: windowLabel, url }).catch((error) => {
+      console.error('error creating reader window', error);
+    });
+  } else {
+    const win = new WebviewWindow(windowLabel, {
+      url,
+      width: 800,
+      height: 600,
+      center: true,
+      resizable: true,
+      title: appService.isMacOSApp ? '' : 'Ashampoo E-Book Reader',
+      decorations: appService.isMacOSApp ? true : false,
+      transparent: appService.isMacOSApp ? false : true,
+      shadow: appService.isMacOSApp ? undefined : true,
+      titleBarStyle: appService.isMacOSApp ? 'overlay' : undefined,
+    });
+    win.once('tauri://created', () => {
+      console.log('new window created');
+    });
+    win.once('tauri://error', (e) => {
+      console.error('error creating window', e);
+    });
+    win.once('tauri://destroyed', () => {
+      readerWindowsCount -= 1;
+    });
+  }
+  readerWindowsCount += 1;
 };
 
 export const showReaderWindow = (appService: AppService, bookIds: string[]) => {

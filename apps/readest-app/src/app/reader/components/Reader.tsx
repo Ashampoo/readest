@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import * as React from 'react';
 import { useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
 import { useEnv } from '@/context/EnvContext';
 import { useTheme } from '@/hooks/useTheme';
@@ -23,6 +24,7 @@ import { isTauriAppPlatform } from '@/services/environment';
 import { getSysFontsList, setSystemUIVisibility } from '@/utils/bridge';
 import { AboutWindow } from '@/components/AboutWindow';
 import { UpdaterWindow } from '@/components/UpdaterWindow';
+import { UI_FEATURES } from '@/services/constants';
 import { KOSyncSettingsWindow } from './KOSyncSettings';
 import { ProofreadRulesManager } from './ProofreadRules';
 import { Toast } from '@/components/Toast';
@@ -77,6 +79,15 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
     }
     initDayjs(getLocale());
   }, []);
+
+  useEffect(() => {
+    if (!isTauriAppPlatform() || !appService?.hasWindow) return;
+    getCurrentWindow()
+      .setMinSize(new LogicalSize(980, 700))
+      .catch((error) => {
+        console.warn('Failed to set reader window min size:', error);
+      });
+  }, [appService]);
 
   useEffect(() => {
     const brightness = settings.screenBrightness;
@@ -158,8 +169,8 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
       <Suspense fallback={<div className='full-height'></div>}>
         <ReaderContent ids={ids} settings={settings} />
         <AboutWindow />
-        <UpdaterWindow />
-        <KOSyncSettingsWindow />
+        {UI_FEATURES.updater && <UpdaterWindow />}
+        {UI_FEATURES.kosync && <KOSyncSettingsWindow />}
         <ProofreadRulesManager />
         <Toast />
       </Suspense>

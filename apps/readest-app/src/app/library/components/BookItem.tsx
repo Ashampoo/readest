@@ -14,6 +14,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { LibraryCoverFitType, LibraryViewModeType } from '@/types/settings';
 import { navigateToLogin } from '@/utils/nav';
+import { UI_FEATURES } from '@/services/constants';
 import { formatAuthors } from '@/utils/book';
 import ReadingProgress from './ReadingProgress';
 import BookCover from '@/components/BookCover';
@@ -148,6 +149,7 @@ const BookItem: React.FC<BookItemProps> = ({
                 ></div>
               )
             ) : (
+              UI_FEATURES.auth &&
               (!book.uploadedAt || (book.uploadedAt && !book.downloadedAt)) && (
                 <button
                   className='show-cloud-button -m-2 p-2'

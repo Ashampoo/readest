@@ -28,8 +28,10 @@ import { getWordCount } from '@/utils/word';
 import { isCfiInLocation } from '@/utils/cfi';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
+import { UI_FEATURES } from '@/services/constants';
 import { getHighlightColorHex } from '../../utils/annotatorUtil';
 import { annotationToolButtons } from './AnnotationTools';
+import { saveViewSettings } from '@/helpers/settings';
 import AnnotationPopup from './AnnotationPopup';
 import WiktionaryPopup from './WiktionaryPopup';
 import WikipediaPopup from './WikipediaPopup';
@@ -150,6 +152,19 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     setSelectedColor(settings.globalReadSettings.highlightStyles[selectedStyle]);
   }, [settings.globalReadSettings.highlightStyles, selectedStyle]);
 
+  useEffect(() => {
+    if (!viewSettings?.annotationQuickAction) return;
+    if (viewSettings.annotationQuickAction === 'dictionary' && !UI_FEATURES.dictionary) {
+      viewSettings.annotationQuickAction = null;
+      saveViewSettings(envConfig, bookKey, 'annotationQuickAction', null, false, true);
+      return;
+    }
+    if (viewSettings.annotationQuickAction === 'wikipedia' && !UI_FEATURES.wikipedia) {
+      viewSettings.annotationQuickAction = null;
+      saveViewSettings(envConfig, bookKey, 'annotationQuickAction', null, false, true);
+    }
+  }, [bookKey, envConfig, viewSettings]);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleDismissPopup = useCallback(
     throttle(() => {
@@ -238,7 +253,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     detail.doc?.addEventListener('selectionchange', () => handleSelectionchange(doc));
 
     // For PDF selections, enable right-click context menu to directly open translator popup.
-    if (bookData.book?.format === 'PDF') {
+    if (UI_FEATURES.translation && bookData.book?.format === 'PDF') {
       detail.doc?.addEventListener('contextmenu', (e: Event) => {
         try {
           const sel = doc.getSelection?.();
@@ -409,13 +424,17 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         handleSearch();
         break;
       case 'dictionary':
-        handleDictionary();
+        if (UI_FEATURES.dictionary) {
+          handleDictionary();
+        }
         break;
       case 'wikipedia':
-        handleWikipedia();
+        if (UI_FEATURES.wikipedia) {
+          handleWikipedia();
+        }
         break;
       case 'translate':
-        handleTranslation();
+        if (UI_FEATURES.translation) handleTranslation();
         break;
       case 'tts':
         handleSpeakText(true);
@@ -651,18 +670,21 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   };
 
   const handleDictionary = () => {
+    if (!UI_FEATURES.dictionary) return;
     if (!selection || !selection.text) return;
     setShowAnnotPopup(false);
     setShowWiktionaryPopup(true);
   };
 
   const handleWikipedia = () => {
+    if (!UI_FEATURES.wikipedia) return;
     if (!selection || !selection.text) return;
     setShowAnnotPopup(false);
     setShowWikipediaPopup(true);
   };
 
   const handleTranslation = () => {
+    if (!UI_FEATURES.translation) return;
     if (!selection || !selection.text) return;
     setShowAnnotPopup(false);
     setShowDeepLPopup(true);
@@ -708,13 +730,19 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         handleCopy(false);
       },
       onTranslateSelection: () => {
-        handleTranslation();
+        if (UI_FEATURES.translation) {
+          handleTranslation();
+        }
       },
       onDictionarySelection: () => {
-        handleDictionary();
+        if (UI_FEATURES.dictionary) {
+          handleDictionary();
+        }
       },
       onWikipediaSelection: () => {
-        handleWikipedia();
+        if (UI_FEATURES.wikipedia) {
+          handleWikipedia();
+        }
       },
       onReadAloudSelection: () => {
         handleSpeakText();
@@ -771,7 +799,9 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     lines.push(`# ${book.title}`);
     lines.push(`**${_('Author')}**: ${book.author || ''}`);
     lines.push('');
-    lines.push(`**${_('Exported from Readest')}**: ${new Date().toISOString().slice(0, 10)}`);
+    lines.push(
+      `**${_('Exported from Ashampoo E-Book Reader')}**: ${new Date().toISOString().slice(0, 10)}`,
+    );
     lines.push('');
     lines.push('---');
     lines.push('');
@@ -864,7 +894,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   return (
     <div ref={containerRef} role='toolbar' tabIndex={-1}>
-      {showWiktionaryPopup && trianglePosition && dictPopupPosition && (
+      {UI_FEATURES.dictionary && showWiktionaryPopup && trianglePosition && dictPopupPosition && (
         <WiktionaryPopup
           word={selection?.text as string}
           lang={bookData.bookDoc?.metadata.language as string}
@@ -875,7 +905,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           onDismiss={handleDismissPopupAndSelection}
         />
       )}
-      {showWikipediaPopup && trianglePosition && dictPopupPosition && (
+      {UI_FEATURES.wikipedia && showWikipediaPopup && trianglePosition && dictPopupPosition && (
         <WikipediaPopup
           text={selection?.text as string}
           lang={bookData.bookDoc?.metadata.language as string}
@@ -886,7 +916,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           onDismiss={handleDismissPopupAndSelection}
         />
       )}
-      {showDeepLPopup && trianglePosition && translatorPopupPosition && (
+      {UI_FEATURES.translation && showDeepLPopup && trianglePosition && translatorPopupPosition && (
         <TranslatorPopup
           text={selection?.text as string}
           position={translatorPopupPosition}

@@ -5,6 +5,7 @@ import { MdRssFeed } from 'react-icons/md';
 
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
+import { UI_FEATURES } from '@/services/constants';
 
 interface ImportMenuProps {
   setIsDropdownOpen?: (open: boolean) => void;
@@ -53,11 +54,13 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
           onClick={handleImportFromDirectory}
         />
       )}
-      <MenuItem
-        label={_('Online Library')}
-        Icon={<MdRssFeed className='h-5 w-5' />}
-        onClick={handleOpenCatalogManager}
-      />
+      {UI_FEATURES.opds && (
+        <MenuItem
+          label={_('Online Library')}
+          Icon={<MdRssFeed className='h-5 w-5' />}
+          onClick={handleOpenCatalogManager}
+        />
+      )}
     </Menu>
   );
 };

@@ -10,6 +10,7 @@ import { KOSyncClient } from '@/services/sync/KOSyncClient';
 import { KOSyncChecksumMethod, KOSyncStrategy } from '@/types/settings';
 import { debounce } from '@/utils/debounce';
 import { getOSPlatform } from '@/utils/misc';
+import { UI_FEATURES } from '@/services/constants';
 import Dialog from '@/components/Dialog';
 
 type Option = {
@@ -53,6 +54,7 @@ const StyledSelect: React.FC<SelectProps> = ({
 };
 
 export const setKOSyncSettingsWindowVisible = (visible: boolean) => {
+  if (!UI_FEATURES.kosync) return;
   const dialog = document.getElementById('kosync_settings_window');
   if (dialog) {
     const event = new CustomEvent('setKOSyncSettingsVisibility', {
@@ -63,6 +65,7 @@ export const setKOSyncSettingsWindowVisible = (visible: boolean) => {
 };
 
 export const KOSyncSettingsWindow: React.FC = () => {
+  if (!UI_FEATURES.kosync) return null;
   const _ = useTranslation();
   const { settings, setSettings, saveSettings } = useSettingsStore();
   const { envConfig, appService } = useEnv();
@@ -101,7 +104,7 @@ export const KOSyncSettingsWindow: React.FC = () => {
   }, [appService]);
 
   useEffect(() => {
-    const defaultName = osName ? `Readest (${osName})` : 'Readest';
+    const defaultName = osName ? `Ashampoo E-Book Reader (${osName})` : 'Ashampoo E-Book Reader';
     setDeviceName(settings.kosync.deviceName || defaultName);
   }, [settings.kosync.deviceName, osName]);
 
@@ -269,7 +272,9 @@ export const KOSyncSettingsWindow: React.FC = () => {
                 </label>
                 <input
                   type='text'
-                  placeholder={osName ? `Readest (${osName})` : 'Readest'}
+                  placeholder={
+                    osName ? `Ashampoo E-Book Reader (${osName})` : 'Ashampoo E-Book Reader'
+                  }
                   className='input input-bordered h-12 w-full focus:outline-none focus:ring-0'
                   value={deviceName}
                   onChange={handleDeviceNameChange}

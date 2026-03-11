@@ -59,6 +59,7 @@ import { removeTabIndex } from '@/utils/a11y';
 import { isCJKLang } from '@/utils/lang';
 import { getLocale } from '@/utils/misc';
 import Spinner from '@/components/Spinner';
+import { UI_FEATURES } from '@/services/constants';
 import KOSyncConflictResolver from './KOSyncResolver';
 
 declare global {
@@ -504,7 +505,7 @@ const FoliateViewer: React.FC<{
         {...touchHandlers}
       />
       {!docLoaded.current && loading && <Spinner loading={true} />}
-      {syncState === 'conflict' && conflictDetails && (
+      {UI_FEATURES.kosync && syncState === 'conflict' && conflictDetails && (
         <KOSyncConflictResolver
           details={conflictDetails}
           onResolveWithLocal={resolveWithLocal}

@@ -120,6 +120,34 @@ async fn start_server(window: Window) -> Result<u16, String> {
     .map_err(|err| err.to_string())
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+async fn open_reader_window(app: AppHandle, label: String, url: String) -> Result<(), String> {
+    let mut builder = WebviewWindowBuilder::new(&app, label, WebviewUrl::App(url.into()))
+        .inner_size(980.0, 700.0)
+        .min_inner_size(980.0, 700.0)
+        .resizable(true);
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .decorations(true)
+            .title_bar_style(TitleBarStyle::Overlay)
+            .title("");
+    }
+
+    #[cfg(all(not(target_os = "macos"), desktop))]
+    {
+        builder = builder
+            .decorations(false)
+            .transparent(true)
+            .shadow(true)
+            .title("Ashampoo E-Book Reader");
+    }
+
+    builder.build().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn get_environment_variable(name: &str) -> String {
     std::env::var(String::from(name)).unwrap_or(String::from(""))
@@ -149,6 +177,8 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         .invoke_handler(tauri::generate_handler![
             start_server,
+            #[cfg(desktop)]
+            open_reader_window,
             download_file,
             upload_file,
             get_environment_variable,
@@ -324,7 +354,10 @@ pub fn run() {
                 });
 
             #[cfg(desktop)]
-            let win_builder = win_builder.inner_size(800.0, 600.0).resizable(true);
+            let win_builder = win_builder
+                .inner_size(800.0, 600.0)
+                .min_inner_size(520.0, 400.0)
+                .resizable(true);
 
             #[cfg(target_os = "macos")]
             let win_builder = win_builder

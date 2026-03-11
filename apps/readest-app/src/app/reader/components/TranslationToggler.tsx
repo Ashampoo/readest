@@ -7,9 +7,12 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { saveViewSettings } from '@/helpers/settings';
 import { isTranslationAvailable } from '@/services/translators/utils';
+import { UI_FEATURES } from '@/services/constants';
 import Button from '@/components/Button';
 
 const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
+  if (!UI_FEATURES.translation) return null;
+
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
   const { getBookData } = useBookDataStore();
