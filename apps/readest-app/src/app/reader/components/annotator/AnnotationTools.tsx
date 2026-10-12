@@ -1,16 +1,17 @@
 import { IconType } from 'react-icons';
 import { FiSearch } from 'react-icons/fi';
 import { FiCopy } from 'react-icons/fi';
+import { FiLink } from 'react-icons/fi';
+import { FiShare } from 'react-icons/fi';
+import { FiImage } from 'react-icons/fi';
 import { PiHighlighterFill } from 'react-icons/pi';
-import { FaWikipediaW } from 'react-icons/fa';
+import { LuBookA } from 'react-icons/lu';
 import { BsPencilSquare } from 'react-icons/bs';
 import { BsTranslate } from 'react-icons/bs';
-import { TbHexagonLetterD } from 'react-icons/tb';
 import { FaHeadphones } from 'react-icons/fa6';
 import { IoIosBuild } from 'react-icons/io';
 import { AnnotationToolType } from '@/types/annotator';
 import { stubTranslation as _ } from '@/utils/misc';
-import { UI_FEATURES } from '@/services/constants';
 
 type AnnotationToolButton = {
   type: AnnotationToolType;
@@ -37,7 +38,19 @@ function createAnnotationToolButtons<T extends AnnotationToolType>(
 }
 
 export const annotationToolButtons = createAnnotationToolButtons([
-  { type: 'copy', label: _('Copy'), tooltip: _('Copy text after selection'), Icon: FiCopy },
+  {
+    type: 'copy',
+    label: _('Copy'),
+    tooltip: _('Copy text after selection'),
+    Icon: FiCopy,
+    quickAction: true,
+  },
+  {
+    type: 'copylink',
+    label: _('Copy Link'),
+    tooltip: _('Copy link to text after selection'),
+    Icon: FiLink,
+  },
   {
     type: 'highlight',
     label: _('Highlight'),
@@ -58,39 +71,20 @@ export const annotationToolButtons = createAnnotationToolButtons([
     Icon: FiSearch,
     quickAction: true,
   },
-  ...(UI_FEATURES.dictionary
-    ? [
-        {
-          type: 'dictionary',
-          label: _('Dictionary'),
-          tooltip: _('Look up text in dictionary after selection'),
-          Icon: TbHexagonLetterD,
-          quickAction: true,
-        } as const,
-      ]
-    : []),
-  ...(UI_FEATURES.wikipedia
-    ? [
-        {
-          type: 'wikipedia',
-          label: _('Wikipedia'),
-          tooltip: _('Look up text in Wikipedia after selection'),
-          Icon: FaWikipediaW,
-          quickAction: true,
-        } as const,
-      ]
-    : []),
-  ...(UI_FEATURES.translation
-    ? [
-        {
-          type: 'translate',
-          label: _('Translate'),
-          tooltip: _('Translate text after selection'),
-          Icon: BsTranslate,
-          quickAction: true,
-        } as const,
-      ]
-    : []),
+  {
+    type: 'dictionary',
+    label: _('Dictionary'),
+    tooltip: _('Look up text in dictionary after selection'),
+    Icon: LuBookA,
+    quickAction: true,
+  },
+  {
+    type: 'translate',
+    label: _('Translate'),
+    tooltip: _('Translate text after selection'),
+    Icon: BsTranslate,
+    quickAction: true,
+  },
   {
     type: 'tts',
     label: _('Speak'),
@@ -103,6 +97,19 @@ export const annotationToolButtons = createAnnotationToolButtons([
     label: _('Proofread'),
     tooltip: _('Proofread text after selection'),
     Icon: IoIosBuild,
+  },
+  {
+    type: 'share',
+    label: _('Share'),
+    tooltip: _('Share text after selection'),
+    Icon: FiShare,
+    quickAction: true,
+  },
+  {
+    type: 'quotecard',
+    label: _('Quote Card'),
+    tooltip: _('Create a quote card image from the selection'),
+    Icon: FiImage,
   },
 ]);
 

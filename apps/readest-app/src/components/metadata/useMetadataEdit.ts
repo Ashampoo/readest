@@ -8,11 +8,13 @@ import {
   ValidationResult,
 } from '@/utils/validation';
 import { MetadataSource } from './SourceSelector';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { searchMetadata } from '@/libs/metadata';
 import { formatAuthors, formatTitle, getPrimaryLanguage } from '@/utils/book';
 
-export const useMetadataEdit = (metadata: BookMetadata | null) => {
+export const useMetadataEdit = (metadata: BookMetadata | null, tags: string[]) => {
   const [editedMeta, setEditedMeta] = useState<BookMetadata>({} as BookMetadata);
+  const [editedTags, setEditedTags] = useState<string[]>(tags);
   const [fieldSources, setFieldSources] = useState<Record<string, string>>({});
   const [lockedFields, setLockedFields] = useState<Record<string, boolean>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -24,11 +26,13 @@ export const useMetadataEdit = (metadata: BookMetadata | null) => {
   const lockableFields = [
     'title',
     'author',
+    'isbn',
     'publisher',
     'published',
     'language',
     'identifier',
     'subject',
+    'tags',
     'description',
     'subtitle',
     'series',
@@ -44,6 +48,10 @@ export const useMetadataEdit = (metadata: BookMetadata | null) => {
   }, [metadata]);
 
   useEffect(() => {
+    setEditedTags([...tags]);
+  }, [tags]);
+
+  useEffect(() => {
     const initialLockedFields: Record<string, boolean> = {};
     lockableFields.forEach((field) => {
       initialLockedFields[field] = false;
@@ -57,12 +65,30 @@ export const useMetadataEdit = (metadata: BookMetadata | null) => {
       return;
     }
 
+    // Tags live on the book, not in the metadata document; they still edit
+    // like Subjects — a separator-split string. Empty segments survive so a
+    // just-typed comma is not swallowed by the value round-trip; they are
+    // dropped at save time.
+    if (field === 'tags') {
+      setEditedTags(value ? value.split(/,|;|，|、/).map((tag) => tag.trim()) : []);
+      return;
+    }
+
     setEditedMeta((prevMeta) => {
       const newMeta = { ...prevMeta } as { [key: string]: unknown };
       switch (field) {
         case 'subject':
           newMeta['subject'] = value ? value.split(/,|;|，|、/).map((s) => s.trim()) : [];
           break;
+        // Number inputs still hand over strings; stored as-is they persist and
+        // sync as "2", and every numeric consumer (formatSeries, the reader's
+        // data-book-series-index) drops the index.
+        case 'seriesIndex':
+        case 'seriesTotal': {
+          const parsed = value ? parseFloat(value) : Number.NaN;
+          newMeta[field] = Number.isFinite(parsed) ? parsed : undefined;
+          break;
+        }
         default:
           newMeta[field] = value;
       }
@@ -130,6 +156,17 @@ export const useMetadataEdit = (metadata: BookMetadata | null) => {
           }
         }
         break;
+
+      case 'isbn':
+        if (value.trim()) {
+          validationResult = validateISBN(value);
+          if (!validationResult.isValid) {
+            console.warn(`Invalid ISBN for field ${field}:`, validationResult.error);
+            setFieldErrors((prev) => ({ ...prev, [field]: validationResult.error || '' }));
+            return false;
+          }
+        }
+        break;
     }
 
     setFieldErrors((prev) => {
@@ -165,13 +202,14 @@ export const useMetadataEdit = (metadata: BookMetadata | null) => {
   };
 
   const handleAutoRetrieve = async () => {
+    if (!UI_FEATURES.metadataAutoRetrieve) return;
     setSearchLoading(true);
     try {
-      const isbnValidation = validateISBN(editedMeta.identifier || '');
+      const isbnValidation = validateISBN(editedMeta.isbn || '');
       const results = await searchMetadata({
         title: formatTitle(editedMeta.title),
         author: formatAuthors(editedMeta.author),
-        isbn: isbnValidation.isValid ? editedMeta.identifier : undefined,
+        isbn: isbnValidation.isValid ? editedMeta.isbn : undefined,
         language: getPrimaryLanguage(editedMeta.language),
       });
       const metadataSources = results.map((result) => ({
@@ -198,6 +236,18 @@ export const useMetadataEdit = (metadata: BookMetadata | null) => {
         return;
       }
       switch (key) {
+        case 'identifier': {
+          const candidate = String(value);
+          const isbnValidation = validateISBN(candidate);
+          if (!lockedFields['isbn'] && isbnValidation.isValid) {
+            newMeta['isbn'] = candidate;
+            newSources['isbn'] = `${selectedSource.sourceName}-${selectedSource.confidence}`;
+          } else {
+            newMeta[key] = value;
+            newSources[key] = `${selectedSource.sourceName}-${selectedSource.confidence}`;
+          }
+          return;
+        }
         default:
           newMeta[key] = value;
       }
@@ -217,13 +267,16 @@ export const useMetadataEdit = (metadata: BookMetadata | null) => {
     if (metadata) {
       setEditedMeta({ ...metadata });
     }
+    setEditedTags([...tags]);
     setFieldSources({});
+    setFieldErrors({});
     setShowSourceSelection(false);
     handleUnlockAll();
   };
 
   return {
     editedMeta,
+    editedTags,
     fieldSources,
     lockedFields,
     fieldErrors,

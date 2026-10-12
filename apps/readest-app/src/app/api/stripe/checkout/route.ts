@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { getStripe } from '@/libs/payment/stripe/server';
 import { validateUserAndToken } from '@/utils/access';
 import { createSupabaseAdminClient } from '@/utils/supabase';
+
+const CHECKOUT_ERROR = 'Error creating checkout session';
+const STRIPE_CHECKOUT_ERROR = 'Stripe rejected the checkout request';
 
 export async function POST(request: NextRequest) {
   const {
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    let customerId;
+    let customerId: string;
     if (!customerData?.stripe_customer_id) {
       const stripe = getStripe();
       const customer = await stripe.customers.create({
@@ -51,7 +55,7 @@ export async function POST(request: NextRequest) {
     const successUrl = `${request.headers.get('origin')}/user/subscription/success?payment=stripe&session_id={CHECKOUT_SESSION_ID}`;
     const returnUrl = `${request.headers.get('origin')}/user`;
     const session = await stripe.checkout.sessions.create({
-      ui_mode: embedded ? 'embedded' : 'hosted',
+      ui_mode: embedded ? 'embedded_page' : 'hosted_page',
       customer: customerId,
       mode: planType === 'subscription' ? 'subscription' : 'payment',
       allow_promotion_codes: true,
@@ -74,6 +78,21 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: 'Error creating checkout session' }, { status: 500 });
+
+    if (!(error instanceof Stripe.errors.StripeError)) {
+      return NextResponse.json({ error: CHECKOUT_ERROR }, { status: 500 });
+    }
+
+    const code = typeof error.code === 'string' ? error.code : undefined;
+    const param = typeof error.param === 'string' ? error.param : undefined;
+    return NextResponse.json(
+      {
+        error: CHECKOUT_ERROR,
+        message: STRIPE_CHECKOUT_ERROR,
+        code,
+        param,
+      },
+      { status: 500 },
+    );
   }
 }

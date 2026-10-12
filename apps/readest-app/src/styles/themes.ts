@@ -1,6 +1,4 @@
 import tinycolor from 'tinycolor2';
-import { stubTranslation as _ } from '../utils/misc';
-import { getContrastHex, getContrastOklch, hexToOklch } from '../utils/color';
 
 export type BaseColor = {
   bg: string;
@@ -8,7 +6,15 @@ export type BaseColor = {
   primary: string;
 };
 
-export type ThemeMode = 'auto' | 'light' | 'dark';
+/** `ambient` follows the ambient light sensor (lux → light/dark), Android-first. */
+export type ThemeMode = 'auto' | 'light' | 'dark' | 'ambient';
+
+/**
+ * Which page's theme is being read or written (issue #5945). The library and
+ * the reader can carry different theme modes and colors; every route that is
+ * not the reader resolves as 'library'.
+ */
+export type ThemeScope = 'library' | 'reader';
 
 export type Palette = {
   'base-100': string;
@@ -29,7 +35,7 @@ export type Theme = {
     light: Palette;
     dark: Palette;
   };
-  isCustomizale?: boolean;
+  isCustomizable?: boolean;
 };
 
 export type CustomTheme = {
@@ -40,6 +46,69 @@ export type CustomTheme = {
     dark: BaseColor;
   };
 };
+
+export type ColorScheme = 'light' | 'dark';
+
+export const getContrastHex = (hexColor: string): string => {
+  return tinycolor(hexColor).isDark() ? '#FFFFFF' : '#000000';
+};
+
+// daisyUI 4 derived every `*-content` color by mixing 80% toward whichever of
+// white/black contrasts better; keep that so primary buttons, badges and
+// tooltips read exactly as they did before the daisyUI 5 upgrade.
+const contentColorFor = (hexColor: string): string => {
+  const towardWhite =
+    tinycolor.readability(hexColor, '#000000') < tinycolor.readability(hexColor, '#ffffff');
+  return tinycolor.mix(hexColor, towardWhite ? '#ffffff' : '#000000', 80).toHexString();
+};
+
+// daisyUI 4's defaults for themes that leave the state colors unset, and the
+// content colors it derived from them.
+const STATE_COLORS = {
+  info: ['oklch(72.06% 0.191 231.6)', 'oklch(14.412% 0.0382 231.6)'],
+  success: ['oklch(64.8% 0.15 160)', 'oklch(12.96% 0.03 160)'],
+  warning: ['oklch(84.71% 0.199 83.87)', 'oklch(16.942% 0.0398 83.87)'],
+  error: ['oklch(71.76% 0.221 22.18)', 'oklch(14.352% 0.0442 22.18)'],
+} as const;
+
+/**
+ * daisyUI 5 theme tokens for a palette. Shared by the build-time plugin that
+ * compiles the built-in themes (daisyui-themes.ts) and by `applyCustomTheme`,
+ * which injects custom themes at runtime, so both paths render identically.
+ * The radius/depth tokens pin daisyUI 4's shape: 0.5rem fields, 1rem boxes,
+ * pill badges and toggles, and no faux-3D shading.
+ */
+export const themeVariables = (palette: Palette, scheme: ColorScheme): Record<string, string> => ({
+  'color-scheme': scheme,
+  '--color-base-100': palette['base-100'],
+  '--color-base-200': palette['base-200'],
+  '--color-base-300': palette['base-300'],
+  '--color-base-content': palette['base-content'],
+  '--color-primary': palette.primary,
+  '--color-primary-content': contentColorFor(palette.primary),
+  '--color-secondary': palette.secondary,
+  '--color-secondary-content': contentColorFor(palette.secondary),
+  '--color-accent': palette.accent,
+  '--color-accent-content': contentColorFor(palette.accent),
+  '--color-neutral': palette.neutral,
+  '--color-neutral-content': palette['neutral-content'],
+  '--color-info': STATE_COLORS.info[0],
+  '--color-info-content': STATE_COLORS.info[1],
+  '--color-success': STATE_COLORS.success[0],
+  '--color-success-content': STATE_COLORS.success[1],
+  '--color-warning': STATE_COLORS.warning[0],
+  '--color-warning-content': STATE_COLORS.warning[1],
+  '--color-error': STATE_COLORS.error[0],
+  '--color-error-content': STATE_COLORS.error[1],
+  '--radius-selector': '1.9rem',
+  '--radius-field': '0.5rem',
+  '--radius-box': '1rem',
+  '--size-selector': '0.25rem',
+  '--size-field': '0.25rem',
+  '--border': '1px',
+  '--depth': '0',
+  '--noise': '0',
+});
 
 export const generateLightPalette = ({ bg, fg, primary }: BaseColor) => {
   return {
@@ -68,6 +137,8 @@ export const generateDarkPalette = ({ bg, fg, primary }: BaseColor) => {
     accent: tinycolor(primary).triad()[1]!.toHexString(), // Triad accent
   } as Palette;
 };
+
+const _ = (stubKey: string) => stubKey;
 
 export const themes = [
   {
@@ -160,112 +231,27 @@ export const themes = [
   },
 ] as Theme[];
 
-const generateCustomThemeVariables = (palette: Palette, fallbackIncluded = false): string => {
-  const colors = `
-    --b1: ${hexToOklch(palette['base-100'])};
-    --b2: ${hexToOklch(palette['base-200'])};
-    --b3: ${hexToOklch(palette['base-300'])};
-    --bc: ${hexToOklch(palette['base-content'])};
-    
-    --p: ${hexToOklch(palette.primary)};
-    --pc: ${getContrastOklch(palette.primary)};
-    
-    --s: ${hexToOklch(palette.secondary)};
-    --sc: ${getContrastOklch(palette.secondary)};
-    
-    --a: ${hexToOklch(palette.accent)};
-    --ac: ${getContrastOklch(palette.accent)};
-    
-    --n: ${hexToOklch(palette.neutral)};
-    --nc: ${hexToOklch(palette['neutral-content'])};
-    
-    --in: 69.37% 0.047 231deg;
-    --inc: 100% 0 0deg;
-    --su: 78.15% 0.12 160deg;
-    --suc: 100% 0 0deg;
-    --wa: 90.69% 0.123 84deg;
-    --wac: 0% 0 0deg;
-    --er: 70.9% 0.184 22deg;
-    --erc: 100% 0 0deg;
-  `;
-
-  const fallbackColors = `
-    --fallback-b1: ${palette['base-100']};
-    --fallback-b2: ${palette['base-200']};
-    --fallback-b3: ${palette['base-300']};
-    --fallback-bc: ${palette['base-content']};
-
-    --fallback-p: ${palette.primary};
-    --fallback-pc: ${getContrastHex(palette.primary)};
-
-    --fallback-s: ${palette.secondary};
-    --fallback-sc: ${getContrastHex(palette.secondary)};
-
-    --fallback-a: ${palette.accent};
-    --fallback-ac: ${getContrastHex(palette.accent)};
-
-    --fallback-n: ${palette.neutral};
-    --fallback-nc: ${palette['neutral-content']};
-
-    --fallback-in: #ff0000;
-    --fallback-inc: #ffffff;
-    --fallback-su: #00ff00;
-    --fallback-suc: #000000;
-    --fallback-wa: #ffff00;
-    --fallback-wac: #000000;
-    --fallback-er: #ff8000;
-    --fallback-erc: #000000;
-  `;
-
-  return colors + (fallbackIncluded ? fallbackColors : '');
+const themeBlock = (name: string, palette: Palette, scheme: ColorScheme): string => {
+  const declarations = Object.entries(themeVariables(palette, scheme))
+    .map(([property, value]) => `  ${property}: ${value};`)
+    .join('\n');
+  return `[data-theme="${name}"] {\n${declarations}\n}`;
 };
 
-export const applyCustomTheme = (
-  customTheme?: CustomTheme,
-  themeName?: string,
-  fallbackIncluded = false,
-) => {
-  if (!customTheme && !themeName) return;
+export const applyCustomTheme = (customTheme: CustomTheme) => {
+  const light = `${customTheme.name}-light`;
+  const dark = `${customTheme.name}-dark`;
+  const css = [
+    themeBlock(light, generateLightPalette(customTheme.colors.light), 'light'),
+    themeBlock(dark, generateDarkPalette(customTheme.colors.dark), 'dark'),
+  ].join('\n');
 
-  const lightThemeName = customTheme ? `${customTheme.name}-light` : `${themeName}-light`;
-  const darkThemeName = customTheme ? `${customTheme.name}-dark` : `${themeName}-dark`;
-
-  const lightPalette = customTheme
-    ? generateLightPalette(customTheme.colors.light)
-    : (themes.find((t) => t.name === themeName) || themes[0]!).colors.light;
-
-  const darkPalette = customTheme
-    ? generateDarkPalette(customTheme.colors.dark)
-    : (themes.find((t) => t.name === themeName) || themes[0]!).colors.dark;
-
-  const css = `
-    [data-theme="${lightThemeName}"] {
-      ${generateCustomThemeVariables(lightPalette, fallbackIncluded)}
-    }
-    
-    [data-theme="${darkThemeName}"] {
-      ${generateCustomThemeVariables(darkPalette, fallbackIncluded)}
-    }
-    
-    :root {
-      --${lightThemeName}: 1;
-      --${darkThemeName}: 1;
-    }
-  `;
-
+  const id = `theme-${customTheme.name}-styles`;
+  document.getElementById(id)?.remove();
   const styleElement = document.createElement('style');
-  styleElement.id = `theme-${customTheme ? customTheme.name : themeName}-styles`;
+  styleElement.id = id;
   styleElement.textContent = css;
-
-  const existingStyle = document.getElementById(styleElement.id);
-  if (existingStyle) {
-    existingStyle.remove();
-  }
-
   document.head.appendChild(styleElement);
 
-  return {
-    light: lightThemeName,
-    dark: darkThemeName,
-  };
+  return { light, dark };
 };

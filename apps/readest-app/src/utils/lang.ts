@@ -13,6 +13,45 @@ export const isCJKLang = (lang: string | null | undefined): boolean => {
   return ['zh', 'ja', 'ko', 'zho', 'jpn', 'kor'].includes(normalizedLang);
 };
 
+/**
+ * Languages whose primary script has no uppercase/lowercase distinction.
+ * Matters for UI rules that lean on the `uppercase` CSS property for visual
+ * emphasis — those rules are no-ops here, so callers usually pair this with
+ * an alternate weight/size treatment (e.g. bigger font-size in section
+ * headers). Covers CJK, Arabic-script (Arabic, Persian), Hebrew, the major
+ * Indic scripts (Devanagari, Bengali, Tamil, Sinhala), Thai, and Tibetan.
+ */
+export const isCaselessLang = (lang: string | null | undefined): boolean => {
+  if (!lang) return false;
+  const normalizedLang = normalizedLangCode(lang);
+  return [
+    'zh',
+    'ja',
+    'ko', // CJK
+    'ar',
+    'fa', // Arabic script
+    'he', // Hebrew
+    'hi',
+    'bn',
+    'ta',
+    'si', // Indic scripts
+    'th', // Thai
+    'bo', // Tibetan
+    'zho',
+    'jpn',
+    'kor',
+    'ara',
+    'fas', // ISO-639-3 aliases
+    'heb',
+    'hin',
+    'ben',
+    'tam',
+    'sin',
+    'tha',
+    'bod',
+  ].includes(normalizedLang);
+};
+
 const ZH_SCRIPTS_MAPPING: Record<string, string> = {
   zh: 'zh-Hans',
   'zh-cn': 'zh-Hans',
@@ -109,9 +148,15 @@ export const inferLangFromScript = (text: string, lang: string): string => {
 
 export const detectLanguage = (content: string): string => {
   try {
-    const iso6393Lang = franc(content.substring(0, 1000));
-    const iso6391Lang = code6393to6391(iso6393Lang) || 'en';
-    return iso6391Lang;
+    const sample = content.substring(0, 1000);
+    const iso6393Lang = franc(sample);
+    const iso6391Lang = code6393to6391(iso6393Lang);
+    if (iso6391Lang) return iso6391Lang;
+    // franc returns "und" for short CJK text such as a TXT title line. Defaulting
+    // to English there sends the caller down the wrong path (e.g. TXT chapter
+    // detection never applies the Chinese regexps), so read the script instead.
+    // See issue #6172.
+    return inferLangFromScript(sample, '') || 'en';
   } catch {
     console.warn('Language detection failed, defaulting to en.');
     return 'en';
@@ -123,7 +168,7 @@ export const getLanguageInfo = (lang: string) => {
   try {
     const canonical = Intl.getCanonicalLocales(lang)[0]!;
     const locale = new Intl.Locale(canonical) as LocaleWithTextInfo;
-    const isCJK = ['zh', 'ja', 'kr'].includes(locale.language);
+    const isCJK = ['zh', 'ja', 'ko'].includes(locale.language);
     const direction = (locale.getTextInfo?.() ?? locale.textInfo)?.direction;
     return { canonical, locale, isCJK, direction };
   } catch (e) {

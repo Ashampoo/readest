@@ -7,14 +7,16 @@ import { BookMetadata } from '@/libs/document';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { flattenContributors, formatAuthors, formatPublisher, formatTitle } from '@/utils/book';
-import { UI_FEATURES } from '@/services/constants';
 import { useFileSelector } from '@/hooks/useFileSelector';
 import { FormField } from './FormField';
 import BookCover from '@/components/BookCover';
+import { useDefaultBookshelfCovers } from '@/hooks/useDefaultBookshelfCovers';
+import { UI_FEATURES } from '@/services/featureFlags';
 
 interface BookDetailEditProps {
   book: Book;
   metadata: BookMetadata;
+  tags: string[];
   fieldSources: Record<string, string>;
   lockedFields: Record<string, boolean>;
   fieldErrors: Record<string, string>;
@@ -34,6 +36,7 @@ const emptyCoverImageUrl = '_blank';
 const BookDetailEdit: React.FC<BookDetailEditProps> = ({
   book,
   metadata,
+  tags,
   fieldSources,
   lockedFields,
   fieldErrors,
@@ -49,6 +52,7 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
 }) => {
   const _ = useTranslation();
   const { appService } = useEnv();
+  const { skeuomorphicCovers } = useDefaultBookshelfCovers();
   const { selectFiles } = useFileSelector(appService, _);
 
   const hasLockedFields = Object.values(lockedFields).some((locked) => locked);
@@ -103,6 +107,12 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
       placeholder: _('Enter total books in series'),
     },
     {
+      field: 'isbn',
+      label: _('ISBN'),
+      value: metadata.isbn || '',
+      placeholder: '9780123456789',
+    },
+    {
       field: 'publisher',
       label: _('Publisher'),
       value: formatPublisher(metadata.publisher || ''),
@@ -126,7 +136,7 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
       field: 'identifier',
       label: _('Identifier'),
       value: metadata.identifier || '',
-      placeholder: '978-0123456789',
+      placeholder: _('Keep existing source identifier'),
     },
   ];
   const metadataFullwidthFields = [
@@ -135,6 +145,12 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
       label: _('Subjects'),
       value: flattenContributors(metadata.subject || []),
       placeholder: _('Fiction, Science, History'),
+    },
+    {
+      field: 'tags',
+      label: _('Tags'),
+      value: tags.join(', '),
+      placeholder: _('Favorites, To Read'),
     },
     {
       field: 'description',
@@ -174,6 +190,7 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
           >
             <BookCover
               mode='list'
+              showSpine={skeuomorphicCovers}
               book={{
                 ...book,
                 metadata: {
@@ -189,15 +206,15 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
               onClick={handleSelectLocalImage}
               disabled={isCoverLocked}
               className={clsx(
-                'flex w-1/2 min-w-0 items-center justify-center gap-1 rounded p-1 sm:w-3/5',
+                'flex w-1/2 min-w-0 items-center justify-center gap-1 rounded-sm p-1 sm:w-3/5',
                 'text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:text-xs',
-                isCoverLocked ? '!text-base-content bg-base-200' : 'bg-gray-100 !text-gray-500',
+                isCoverLocked ? 'text-base-content! bg-base-200' : 'bg-gray-100 text-gray-500!',
               )}
               title={_('Change cover image')}
             >
               <MdEdit
                 className={clsx(
-                  'h-5 w-5 flex-shrink-0 sm:h-4 sm:w-4',
+                  'h-5 w-5 shrink-0 sm:h-4 sm:w-4',
                   isCoverLocked ? 'fill-base-content' : 'fill-gray-600',
                 )}
               />
@@ -213,10 +230,10 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
               }}
               disabled={isCoverLocked}
               className={clsx(
-                'flex w-1/4 items-center justify-center rounded p-1 sm:w-1/5',
+                'flex w-1/4 items-center justify-center rounded-sm p-1 sm:w-1/5',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 'text-red-500 hover:bg-red-50 hover:text-red-600',
-                isCoverLocked ? '!text-base-content bg-base-200' : 'bg-gray-100',
+                isCoverLocked ? 'text-base-content! bg-base-200' : 'bg-gray-100',
               )}
               title={_('Remove cover image')}
             >
@@ -226,7 +243,7 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
             <button
               onClick={() => onToggleFieldLock('coverImageUrl')}
               className={clsx(
-                'flex w-1/4 items-center justify-center rounded p-1 hover:bg-gray-50 sm:w-1/5',
+                'flex w-1/4 items-center justify-center rounded-sm p-1 hover:bg-gray-50 sm:w-1/5',
                 isCoverLocked
                   ? 'bg-green-100 text-green-500 hover:bg-green-200'
                   : 'bg-gray-100 text-gray-500',
@@ -321,17 +338,12 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
           )}
 
           {/* Lock/Unlock All Buttons */}
-          <div
-            className={clsx(
-              'flex items-center gap-1 pl-2',
-              UI_FEATURES.metadataAutoRetrieve && 'border-l border-gray-300',
-            )}
-          >
+          <div className='flex items-center gap-1 border-l border-gray-300 pl-2'>
             <button
               onClick={onUnlockAll}
               disabled={!hasLockedFields}
               className={clsx(
-                'hover:bg-base-200 flex items-center gap-1 rounded px-2 py-1 text-sm',
+                'hover:bg-base-200 flex items-center gap-1 rounded-sm px-2 py-1 text-sm',
                 'disabled:cursor-not-allowed disabled:opacity-80',
                 'text-yellow-600 hover:text-yellow-700',
               )}
@@ -344,7 +356,7 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
               onClick={onLockAll}
               disabled={allFieldsLocked}
               className={clsx(
-                'hover:bg-base-200 flex items-center gap-1 rounded px-2 py-1 text-sm',
+                'hover:bg-base-200 flex items-center gap-1 rounded-sm px-2 py-1 text-sm',
                 'disabled:cursor-not-allowed disabled:opacity-80',
                 'text-green-600 hover:text-green-700',
               )}

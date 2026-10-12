@@ -1,15 +1,17 @@
 import clsx from 'clsx';
 import React from 'react';
-import { MdCheck } from 'react-icons/md';
 import { useEnv } from '@/context/EnvContext';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useReaderStore } from '@/store/readerStore';
 import { useCustomFontStore } from '@/store/customFontStore';
-import { useResponsiveSize } from '@/hooks/useResponsiveSize';
+import { saveViewSettings } from '@/helpers/settings';
 import { SettingsPanelType } from './SettingsDialog';
+import Menu from '@/components/Menu';
 import MenuItem from '@/components/MenuItem';
 
 interface DialogMenuProps {
+  bookKey: string;
   activePanel: SettingsPanelType;
   setIsDropdownOpen?: (open: boolean) => void;
   onReset: () => void;
@@ -17,6 +19,7 @@ interface DialogMenuProps {
 }
 
 const DialogMenu: React.FC<DialogMenuProps> = ({
+  bookKey,
   activePanel,
   setIsDropdownOpen,
   onReset,
@@ -24,12 +27,16 @@ const DialogMenu: React.FC<DialogMenuProps> = ({
 }) => {
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
-  const iconSize = useResponsiveSize(16);
-  const { setFontPanelView, isSettingsGlobal, setSettingsGlobal } = useSettingsStore();
+  const { setFontPanelView } = useSettingsStore();
+  const { getViewSettings } = useReaderStore();
   const { getAllFonts, removeFont, saveCustomFonts } = useCustomFontStore();
+  const viewSettings = getViewSettings(bookKey);
+  const isSettingsGlobal = viewSettings?.isGlobal ?? true;
 
-  const handleToggleGlobal = () => {
-    setSettingsGlobal(!isSettingsGlobal);
+  const handleSetGlobal = (global: boolean) => {
+    if (global !== isSettingsGlobal) {
+      saveViewSettings(envConfig, bookKey, 'isGlobal', global, true, false);
+    }
     setIsDropdownOpen?.(false);
   };
 
@@ -54,18 +61,23 @@ const DialogMenu: React.FC<DialogMenuProps> = ({
   };
 
   return (
-    <div
-      className={clsx(
-        'dropdown-content dropdown-right no-triangle border-base-200 z-20 mt-1 border shadow-2xl',
-        'text-base sm:text-sm',
-      )}
-    >
+    <Menu className={clsx('dialog-menu dropdown-content no-triangle z-20 mt-2 shadow-2xl')}>
+      {/* Two exclusive rows rather than one "Global Settings" checkmark: the
+          checkmark named the mode but not the consequence, and the consequence
+          only lived in a `lg:tooltip` + native `title`, neither of which fires
+          on touch — so on phones and tablets nothing in the app ever said that
+          a font change here reaches every book (issue #5932). */}
       <MenuItem
-        label={_('Global Settings')}
-        tooltip={isSettingsGlobal ? _('Apply to All Books') : _('Apply to This Book')}
-        buttonClass='lg:tooltip'
-        Icon={isSettingsGlobal ? <MdCheck size={iconSize} className='text-base-content' /> : null}
-        onClick={handleToggleGlobal}
+        label={_('Apply to All Books')}
+        disabled={!bookKey}
+        toggled={isSettingsGlobal}
+        onClick={() => handleSetGlobal(true)}
+      />
+      <MenuItem
+        label={_('Apply to This Book')}
+        disabled={!bookKey}
+        toggled={!isSettingsGlobal}
+        onClick={() => handleSetGlobal(false)}
       />
       <MenuItem label={resetLabel || _('Reset Settings')} onClick={handleResetToDefaults} />
       {activePanel === 'Font' && (
@@ -74,7 +86,7 @@ const DialogMenu: React.FC<DialogMenuProps> = ({
           <MenuItem label={_('Manage Custom Fonts')} onClick={handleManageCustomFont} />
         </>
       )}
-    </div>
+    </Menu>
   );
 };
 

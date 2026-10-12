@@ -1,26 +1,36 @@
 import clsx from 'clsx';
-import { useTranslation } from '@/hooks/useTranslation';
+import { MdLanguage, MdMenuBook, MdRssFeed } from 'react-icons/md';
+import { LuLibrary } from 'react-icons/lu';
 import { IoFileTray } from 'react-icons/io5';
-import { MdRssFeed } from 'react-icons/md';
-
+import { UI_FEATURES } from '@/services/featureFlags';
+import { useEnv } from '@/context/EnvContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
-import { UI_FEATURES } from '@/services/constants';
 
-interface ImportMenuProps {
+export interface ImportMenuProps {
+  menuClassName?: string;
   setIsDropdownOpen?: (open: boolean) => void;
   onImportBooksFromFiles: () => void;
   onImportBooksFromDirectory?: () => void;
+  onImportFromWebBrowser?: () => void;
+  onImportBookFromNovelUrl?: () => void;
   onOpenCatalogManager: () => void;
+  onOpenFeeds: () => void;
 }
 
 const ImportMenu: React.FC<ImportMenuProps> = ({
+  menuClassName,
   setIsDropdownOpen,
   onImportBooksFromFiles,
   onImportBooksFromDirectory,
+  onImportFromWebBrowser,
+  onImportBookFromNovelUrl,
   onOpenCatalogManager,
+  onOpenFeeds,
 }) => {
   const _ = useTranslation();
+  const { appService } = useEnv();
 
   const handleImportFromFiles = () => {
     onImportBooksFromFiles();
@@ -32,14 +42,32 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
     setIsDropdownOpen?.(false);
   };
 
+  const handleImportFromWebBrowser = () => {
+    onImportFromWebBrowser?.();
+    setIsDropdownOpen?.(false);
+  };
+
+  const handleImportFromNovelUrl = () => {
+    onImportBookFromNovelUrl?.();
+    setIsDropdownOpen?.(false);
+  };
+
   const handleOpenCatalogManager = () => {
     onOpenCatalogManager();
     setIsDropdownOpen?.(false);
   };
 
+  const handleOpenFeeds = () => {
+    onOpenFeeds();
+    setIsDropdownOpen?.(false);
+  };
+
   return (
     <Menu
-      className={clsx('dropdown-content bg-base-100 rounded-box z-[1] mt-3 p-2 shadow')}
+      className={clsx(
+        'dropdown-content bg-base-100 rounded-box relative! z-[1] mt-3 p-2 shadow-sm',
+        menuClassName,
+      )}
       onCancel={() => setIsDropdownOpen?.(false)}
     >
       <MenuItem
@@ -54,10 +82,30 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
           onClick={handleImportFromDirectory}
         />
       )}
+      <hr aria-hidden='true' className='border-base-200 my-1' />
+      {onImportFromWebBrowser && (
+        <MenuItem
+          label={_('From Web Browser')}
+          Icon={<MdLanguage className='h-5 w-5' />}
+          onClick={handleImportFromWebBrowser}
+        />
+      )}
+      {onImportBookFromNovelUrl && (
+        <MenuItem
+          label={_('From Web Novel')}
+          Icon={<MdMenuBook className='h-5 w-5' />}
+          onClick={handleImportFromNovelUrl}
+        />
+      )}
+      <MenuItem
+        label={_('From Feed URL')}
+        Icon={<MdRssFeed className='h-5 w-5' />}
+        onClick={handleOpenFeeds}
+      />
       {UI_FEATURES.opds && (
         <MenuItem
-          label={_('Online Library')}
-          Icon={<MdRssFeed className='h-5 w-5' />}
+          label={appService?.isOnlineCatalogsAccessible ? _('Online Library') : _('OPDS Catalogs')}
+          Icon={<LuLibrary className='h-5 w-5' />}
           onClick={handleOpenCatalogManager}
         />
       )}

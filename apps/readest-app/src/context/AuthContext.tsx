@@ -1,10 +1,18 @@
 'use client';
 
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import {
+  createContext,
+  useState,
+  useContext,
+  useCallback,
+  useMemo,
+  ReactNode,
+  useEffect,
+} from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/utils/supabase';
 import posthog from 'posthog-js';
-import { UI_FEATURES } from '@/services/constants';
+import { UI_FEATURES } from '@/services/featureFlags';
 
 interface AuthContextType {
   token: string | null;
@@ -18,12 +26,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(() => {
+    if (!UI_FEATURES.auth) return null;
     if (typeof window !== 'undefined') {
       return localStorage.getItem('token');
     }
     return null;
   });
   const [user, setUser] = useState<User | null>(() => {
+    if (!UI_FEATURES.auth) return null;
     if (typeof window !== 'undefined') {
       const userJson = localStorage.getItem('user');
       return userJson ? JSON.parse(userJson) : null;
@@ -32,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   useEffect(() => {
+    if (!UI_FEATURES.auth) return;
     const syncSession = (
       session: { access_token: string; refresh_token: string; user: User } | null,
     ) => {
@@ -41,13 +52,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('token', access_token);
         localStorage.setItem('refresh_token', refresh_token);
         localStorage.setItem('user', JSON.stringify(user));
-        if (UI_FEATURES.telemetry) {
-          posthog.identify(user.id);
-        }
+        if (UI_FEATURES.telemetry) posthog.identify(user.id);
         setToken(access_token);
         setUser(user);
       } else {
-        console.log('Clearing session');
         localStorage.removeItem('token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
@@ -73,39 +81,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  // setToken / setUser from useState are stable across renders, so the empty
+  // deps array is correct. Wrapping in useCallback (and only including stable
+  // refs in the deps) is what makes the useMemo below actually memoize the
+  // context value — without this, login/logout/refresh would be recreated on
+  // every render and the memo would always invalidate.
+  const login = useCallback((newToken: string, newUser: User) => {
+    if (!UI_FEATURES.auth) return;
     console.log('Logging in');
     setToken(newToken);
     setUser(newUser);
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     console.log('Logging out');
     try {
       await supabase.auth.refreshSession();
     } catch {
     } finally {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       setToken(null);
       setUser(null);
     }
-  };
+  }, []);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       await supabase.auth.refreshSession();
     } catch {}
-  };
+  }, []);
 
-  return (
-    <AuthContext.Provider value={{ token, user, login, logout, refresh }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ token, user, login, logout, refresh }),
+    [token, user, login, logout, refresh],
   );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {

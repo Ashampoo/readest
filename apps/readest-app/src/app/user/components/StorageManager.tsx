@@ -1,7 +1,8 @@
 'use client';
 
 import clsx from 'clsx';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { MdSearch } from 'react-icons/md';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useLibraryStore } from '@/store/libraryStore';
@@ -16,7 +17,6 @@ import {
   type ListFilesParams,
 } from '@/libs/storage';
 import { eventDispatcher } from '@/utils/event';
-import { debounce } from '@/utils/debounce';
 import Spinner from '@/components/Spinner';
 import Alert from '@/components/Alert';
 
@@ -85,18 +85,24 @@ const StorageManager = () => {
     loadStats();
   }, [loadFiles, loadStats]);
 
-  // Group files by book_hash
+  // Group files by their natural row identity:
+  //   - book_hash for book uploads
+  //   - replica_kind:replica_id for replica binaries (each dictionary,
+  //     font, etc. clusters under its own row)
+  //   - 'no-group' as a final catch-all
+  const groupKeyFor = (file: FileRecord): string => {
+    if (file.book_hash) return file.book_hash;
+    if (file.replica_id) return `replica:${file.replica_kind ?? '?'}:${file.replica_id}`;
+    return 'no-group';
+  };
+
   const groupedFiles = React.useMemo(() => {
     const groups = new Map<string, FileRecord[]>();
-
     files.forEach((file) => {
-      const bookHash = file.book_hash || 'no-book';
-      if (!groups.has(bookHash)) {
-        groups.set(bookHash, []);
-      }
-      groups.get(bookHash)!.push(file);
+      const key = groupKeyFor(file);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(file);
     });
-
     return groups;
   }, [files]);
 
@@ -109,9 +115,19 @@ const StorageManager = () => {
     return getFileName(file.file_key).toLowerCase() === 'cover.png';
   };
 
-  // Get main book file (first non-cover file)
-  const getMainBookFile = (bookFiles: FileRecord[]): FileRecord | null => {
-    return bookFiles.find((f) => !isCoverFile(f)) || bookFiles[0] || null;
+  // Pick the file whose name labels the group:
+  //   - book groups: first non-cover file (existing behavior).
+  //   - replica groups: the largest file. The primary binary
+  //     (dictionary .mdx, font .ttf, etc.) dominates the bundle by
+  //     size, so labelling by it surfaces the natural identifier
+  //     rather than a tiny sidecar like dacihai.css.
+  const getMainBookFile = (groupFiles: FileRecord[]): FileRecord | null => {
+    if (groupFiles.length === 0) return null;
+    const isReplicaGroup = !groupFiles[0]!.book_hash && !!groupFiles[0]!.replica_id;
+    if (isReplicaGroup) {
+      return groupFiles.reduce((a, b) => (b.file_size > a.file_size ? b : a));
+    }
+    return groupFiles.find((f) => !isCoverFile(f)) || groupFiles[0] || null;
   };
 
   // Get all files for a book including covers
@@ -226,25 +242,21 @@ const StorageManager = () => {
     }
   };
 
-  const handleSearchChange = useMemo(
-    () =>
-      debounce((value: string) => {
-        setSearchQuery(value);
-        setCurrentPage(1);
-      }, 1000),
-    [setSearchQuery, setCurrentPage],
-  );
-
-  useEffect(() => {
-    handleSearchChange(searchInput);
-  }, [searchInput, handleSearchChange]);
+  // Search runs only when it is asked for. Searching as the user types
+  // interrupts IME candidate selection and long queries, and the pending
+  // request steals the input while it loads.
+  const submitSearch = () => {
+    setSearchQuery(searchInput.trim());
+    setCurrentPage(1);
+  };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1e6) return `${Math.round((bytes / 1024) * 10) / 10} KB`;
+    const inGB = bytes > 1e9;
+    const value = bytes / 1024 / 1024 / (inGB ? 1024 : 1);
+    return `${Math.round(value * 10) / 10} ${inGB ? 'GB' : 'MB'}`;
   };
 
   const formatDate = (dateString: string): string => {
@@ -321,14 +333,32 @@ const StorageManager = () => {
           </div>
 
           <div className='flex flex-col gap-2 sm:flex-row'>
-            <input
-              type='text'
-              placeholder={_('Search files...')}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className='input input-bordered input-sm w-full sm:w-64'
-              disabled={loading}
-            />
+            <form
+              className='flex gap-2'
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitSearch();
+              }}
+            >
+              <input
+                type='search'
+                placeholder={_('Search files...')}
+                aria-label={_('Search files...')}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter commits the IME candidate; it must not submit too.
+                  if (e.key === 'Enter' && e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                  }
+                }}
+                className='input input-sm eink-bordered w-full min-w-0 sm:w-64'
+              />
+              <button type='submit' className='btn btn-sm btn-contrast shrink-0' disabled={loading}>
+                <MdSearch className='h-4 w-4' />
+                {_('Search')}
+              </button>
+            </form>
 
             <select
               value={`${sortBy}-${sortOrder}`}
@@ -338,7 +368,7 @@ const StorageManager = () => {
                 setSortOrder(newSortOrder as 'asc' | 'desc');
               }}
               disabled={loading}
-              className='select select-bordered select-sm'
+              className='select select-sm'
             >
               <option value='created_at-desc'>{_('Newest First')}</option>
               <option value='created_at-asc'>{_('Oldest First')}</option>
@@ -382,7 +412,7 @@ const StorageManager = () => {
                     />
                   </div>
                 </th>
-                <th className='!ps-0'>{_('File Name')}</th>
+                <th className='ps-0!'>{_('File Name')}</th>
                 <th className='hidden sm:table-cell'>{_('Size')}</th>
                 <th className='hidden sm:table-cell'>{_('Created')}</th>
               </tr>
@@ -395,7 +425,7 @@ const StorageManager = () => {
                       <td className='min-w-16'>
                         <div className='skeleton h-5 w-5'></div>
                       </td>
-                      <td className='max-w-0 !ps-0 sm:w-[80%]'>
+                      <td className='max-w-0 ps-0! sm:w-[80%]'>
                         <div className='flex flex-col gap-2'>
                           <div className='skeleton h-4 w-3/4'></div>
                           <div className='skeleton h-3 w-1/2 sm:hidden'></div>
@@ -431,7 +461,7 @@ const StorageManager = () => {
                   return (
                     <React.Fragment key={bookHash}>
                       {/* Main book row */}
-                      <tr className='hover'>
+                      <tr className='hover:bg-base-200'>
                         <td>
                           <div className='flex items-center gap-1'>
                             <input
@@ -454,14 +484,14 @@ const StorageManager = () => {
                             )}
                           </div>
                         </td>
-                        <td className='max-w-0 !ps-0 sm:w-[80%]'>
+                        <td className='max-w-0 ps-0! sm:w-[80%]'>
                           <div className='flex flex-col'>
                             <div className='flex items-center gap-2'>
                               <span className='text-base-content block max-w-full truncate font-medium'>
                                 {getFileName(mainFile.file_key)}
                               </span>
                               {hasMultipleFiles && (
-                                <span className='text-base-content/60 flex-shrink-0 whitespace-nowrap text-xs'>
+                                <span className='text-base-content/60 shrink-0 whitespace-nowrap text-xs'>
                                   ({bookFiles.length} {_('files')})
                                 </span>
                               )}
@@ -483,7 +513,7 @@ const StorageManager = () => {
                       {/* Expanded files (excluding covers unless expanded) */}
                       {isExpanded &&
                         bookFiles.map((file) => (
-                          <tr key={file.file_key} className='hover bg-base-200/50'>
+                          <tr key={file.file_key} className='hover:bg-base-200 bg-base-200/50'>
                             <td>
                               <div className='pl-4'>
                                 <input
@@ -497,7 +527,7 @@ const StorageManager = () => {
                                 />
                               </div>
                             </td>
-                            <td className='max-w-0 !ps-0 sm:w-[80%]'>
+                            <td className='max-w-0 ps-0! sm:w-[80%]'>
                               <div className='flex flex-col'>
                                 <span className='text-base-content/80 text-xs'>
                                   {getFileName(file.file_key)}

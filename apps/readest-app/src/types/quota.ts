@@ -7,12 +7,14 @@ export interface UserQuota {
 
 export type UserStorageQuota = UserQuota;
 export type UserDailyTranslationQuota = UserQuota;
+export type UserDailyTTSQuota = UserQuota;
 export type QuotaType = {
   name: string;
   tooltip: string;
   used: number;
   total: number;
   unit: string;
+  resetAt?: number;
 };
 
 export type QuotaFeature = 'storage' | 'translation' | 'tokens' | 'customization' | 'generic';

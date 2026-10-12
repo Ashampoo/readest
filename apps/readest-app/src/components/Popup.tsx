@@ -1,8 +1,51 @@
 import clsx from 'clsx';
-import { Position } from '@/utils/sel';
+import { Position, isPointInRect } from '@/utils/sel';
 import { useEffect, useRef, useState } from 'react';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
+
+const getTriangleStyles = (
+  trianglePosition: Position | undefined,
+  size: number,
+  offset: number,
+): React.CSSProperties => {
+  if (!trianglePosition) {
+    return { left: '-999px', top: '-999px' };
+  }
+
+  const { dir, point } = trianglePosition;
+
+  let topOffset = 0;
+  let leftOffset = 0;
+  switch (dir) {
+    case 'up':
+      topOffset = offset;
+      break;
+    case 'down':
+      topOffset = -offset;
+      break;
+    case 'left':
+      leftOffset = offset;
+      break;
+    case 'right':
+      leftOffset = -offset;
+      break;
+  }
+
+  return {
+    left: `${point.x + leftOffset}px`,
+    top: `${point.y + topOffset}px`,
+    borderLeft:
+      dir === 'right' ? 'none' : dir === 'left' ? `${size}px solid` : `${size}px solid transparent`,
+    borderRight:
+      dir === 'left' ? 'none' : dir === 'right' ? `${size}px solid` : `${size}px solid transparent`,
+    borderTop:
+      dir === 'down' ? 'none' : dir === 'up' ? `${size}px solid` : `${size}px solid transparent`,
+    borderBottom:
+      dir === 'up' ? 'none' : dir === 'down' ? `${size}px solid` : `${size}px solid transparent`,
+    transform: dir === 'left' || dir === 'right' ? 'translateY(-50%)' : 'translateX(-50%)',
+  };
+};
 
 const Popup = ({
   width,
@@ -13,7 +56,6 @@ const Popup = ({
   trianglePosition,
   children,
   className = '',
-  triangleClassName = '',
   additionalStyle = {},
   isOpen = true,
   onDismiss,
@@ -27,7 +69,6 @@ const Popup = ({
   trianglePosition?: Position;
   children: React.ReactNode;
   className?: string;
-  triangleClassName?: string;
   additionalStyle?: React.CSSProperties;
   onDismiss?: () => void;
 }) => {
@@ -50,7 +91,13 @@ const Popup = ({
     if (!containerRef.current) return;
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const newHeight = entry.contentRect.height;
+        // Measure the border box: contentRect is the content box, which
+        // under-reports by 2px when e-ink mode adds the 1px container border.
+        // The height positions the popup against the triangle attachment
+        // point, so a short measurement drops the popup onto the triangle and
+        // flips triangleHidden, hiding the white inner triangle behind the
+        // black outer one (solid black triangle on e-ink).
+        const newHeight = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
         if (newHeight !== childrenHeight) {
           setChildrenHeight(newHeight);
           return;
@@ -82,14 +129,54 @@ const Popup = ({
     setAdjustedPosition(newPosition);
   }, [position, trianglePosition, popupPadding, childrenHeight]);
 
+  const triangleSize = 7;
+  const outerTriangleStyles = getTriangleStyles(trianglePosition, triangleSize, 0);
+  const innerTriangleStyles = getTriangleStyles(trianglePosition, triangleSize, -1);
+
+  const popupHeight = height ?? childrenHeight;
+  const triangleHidden = !!(
+    adjustedPosition &&
+    trianglePosition &&
+    isPointInRect(trianglePosition.point, {
+      left: adjustedPosition.point.x,
+      top: adjustedPosition.point.y,
+      right: adjustedPosition.point.x + width,
+      bottom: adjustedPosition.point.y + popupHeight,
+    })
+  );
+
   return (
+    // No `filter` (drop-shadow) on this wrapper: it would become the containing
+    // block and stacking context for the absolutely positioned popup below,
+    // re-anchoring it off the viewport and demoting its z-50 under later reader
+    // chrome. The triangle shadow lives on the triangle itself.
     <div>
+      {/* Never mount the triangles without a position, and never combine
+          `invisible` with the drop-shadow: FootnotePopup keeps a closed Popup
+          mounted in every book cell, and an always-mounted filtered element at
+          the cell origin makes WebKitGTK stop presenting an ~80x124 device-px
+          rect there — the Linux stale/black corner square (#5609, bisected to
+          #5351's triangle filter). */}
+      {trianglePosition && (
+        <div
+          className={clsx(
+            'popup-triangle-outer text-base-content/20 absolute z-50',
+            triangleHidden ? 'invisible' : 'not-eink:drop-shadow-xl visible',
+          )}
+          style={outerTriangleStyles}
+        />
+      )}
       <div
         id='popup-container'
         ref={containerRef}
+        aria-hidden={!isOpen}
+        data-capture-blocking-overlay={isOpen ? 'true' : undefined}
+        // `[data-eink] .popup-container` in globals.css already forces the 1px
+        // base-content border and base-100 background, so no eink-bordered here.
         className={clsx(
-          'bg-base-300 absolute z-50 rounded-lg font-sans',
-          trianglePosition?.dir !== 'up' && 'shadow-xl',
+          'popup-container text-base-content absolute z-50 rounded-lg border font-sans',
+          'not-eink:border-base-content/20 not-eink:shadow-2xl',
+          'bg-base-300 theme-dark:bg-base-100',
           className,
         )}
         style={{
@@ -104,51 +191,15 @@ const Popup = ({
       >
         {children}
       </div>
-      <div
-        className={`triangle text-base-300 absolute z-50 ${triangleClassName}`}
-        style={{
-          left:
-            trianglePosition?.dir === 'left'
-              ? `${trianglePosition.point.x}px`
-              : trianglePosition?.dir === 'right'
-                ? `${trianglePosition.point.x}px`
-                : `${trianglePosition ? trianglePosition.point.x : -999}px`,
-          top:
-            trianglePosition?.dir === 'up'
-              ? `${trianglePosition.point.y}px`
-              : trianglePosition?.dir === 'down'
-                ? `${trianglePosition.point.y}px`
-                : `${trianglePosition ? trianglePosition.point.y : -999}px`,
-          borderLeft:
-            trianglePosition?.dir === 'right'
-              ? 'none'
-              : trianglePosition?.dir === 'left'
-                ? `7px solid`
-                : '7px solid transparent',
-          borderRight:
-            trianglePosition?.dir === 'left'
-              ? 'none'
-              : trianglePosition?.dir === 'right'
-                ? `7px solid`
-                : '7px solid transparent',
-          borderTop:
-            trianglePosition?.dir === 'down'
-              ? 'none'
-              : trianglePosition?.dir === 'up'
-                ? `7px solid`
-                : '7px solid transparent',
-          borderBottom:
-            trianglePosition?.dir === 'up'
-              ? 'none'
-              : trianglePosition?.dir === 'down'
-                ? `7px solid`
-                : '7px solid transparent',
-          transform:
-            trianglePosition?.dir === 'left' || trianglePosition?.dir === 'right'
-              ? 'translateY(-50%)'
-              : 'translateX(-50%)',
-        }}
-      />
+      {trianglePosition && (
+        <div
+          className={clsx(
+            'popup-triangle-inner text-base-300 theme-dark:text-base-100 absolute z-50',
+            triangleHidden ? 'invisible' : 'visible',
+          )}
+          style={innerTriangleStyles}
+        />
+      )}
     </div>
   );
 };

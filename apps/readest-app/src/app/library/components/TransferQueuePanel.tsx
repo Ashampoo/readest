@@ -17,7 +17,16 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { useLibraryStore } from '@/store/libraryStore';
-import { TransferItem, TransferStatus, useTransferStore } from '@/store/transferStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { isReadestCloudStorageActive } from '@/services/sync/cloudSyncProvider';
+import { isSyncCategoryEnabled } from '@/services/sync/syncCategories';
+import { isFeedBook } from '@/services/rss/feedBookUrl';
+import {
+  TransferItem,
+  TransferStatus,
+  isFailedLikeTransfer,
+  useTransferStore,
+} from '@/store/transferStore';
 
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
@@ -52,7 +61,7 @@ const formatDateTime = (timestamp: number): string => {
 
 const StatusIcon: React.FC<{
   status: TransferStatus;
-  type: 'upload' | 'download';
+  type: 'upload' | 'download' | 'delete';
   size: number;
 }> = ({ status, type, size }) => {
   switch (status) {
@@ -67,6 +76,8 @@ const StatusIcon: React.FC<{
     default:
       return type === 'upload' ? (
         <MdCloudUpload className='text-primary' size={size} />
+      ) : type === 'delete' ? (
+        <MdDeleteSweep className='text-primary' size={size} />
       ) : (
         <MdCloudDownload className='text-primary' size={size} />
       );
@@ -80,6 +91,12 @@ const TransferItemRow: React.FC<{
   iconSize: number;
 }> = ({ transfer, onCancel, onRetry, iconSize }) => {
   const _ = useTranslation();
+
+  const completedLabel = {
+    upload: _('Uploaded'),
+    download: _('Downloaded'),
+    delete: _('Deleted'),
+  };
 
   return (
     <div className='hover:bg-base-200 flex items-center gap-3 rounded-lg p-3'>
@@ -100,8 +117,11 @@ const TransferItemRow: React.FC<{
           {transfer.status === 'failed' && (
             <span className='text-error'>{transfer.error || _('Failed')}</span>
           )}
-          {transfer.status === 'completed' && _('Completed')}
-          {transfer.status === 'cancelled' && _('Cancelled')}
+          {transfer.status === 'completed' && (completedLabel[transfer.type] || _('Completed'))}
+          {transfer.status === 'cancelled' &&
+            (transfer.cancelReason === 'policy'
+              ? `${_('Cancelled')} · ${_('Cloud provider switched')}`
+              : _('Cancelled'))}
           {' · '}
           {formatDateTime(transfer.completedAt || transfer.startedAt || transfer.createdAt)}
         </div>
@@ -117,7 +137,7 @@ const TransferItemRow: React.FC<{
       </div>
 
       <div className='flex items-center gap-1'>
-        {(transfer.status === 'failed' || transfer.status === 'cancelled') && (
+        {isFailedLikeTransfer(transfer) && (
           <button
             onClick={() => onRetry(transfer.id)}
             className='btn btn-ghost btn-sm btn-circle'
@@ -158,6 +178,7 @@ const TransferQueuePanel: React.FC = () => {
     resumeQueue,
     clearCompleted,
     clearFailed,
+    clearPending,
     queueUpload,
     queueDownload,
   } = useTransferQueue();
@@ -167,19 +188,33 @@ const TransferQueuePanel: React.FC = () => {
   const onClose = () => setIsOpen(false);
   const divRef = useKeyDownActions({ onCancel: onClose, onConfirm: onClose });
 
+  // Both bulk actions target Readest Cloud storage; while a third-party provider
+  // is selected the queue refuses book uploads and a queued download would ask
+  // Readest storage for a file that only exists on the provider, so hide both
+  // affordances (per-book Upload / Download in the shelf are provider-routed, and
+  // replica transfers keep flowing regardless).
+  const settings = useSettingsStore((s) => s.settings);
+  const readestStorageActive = isReadestCloudStorageActive(settings);
+  // Uploads made with Books sync off never get a `books` row, so no other
+  // device could list them; the queue refuses them too.
+  const uploadAllowed = readestStorageActive && isSyncCategoryEnabled('book');
+
+  // Feed books are fileless (#5307): sweeping them into "Upload All" only fills
+  // the queue with transfers that can never resolve a source.
   const booksToUpload = getVisibleLibrary().filter(
-    (book) => book.downloadedAt && !book.uploadedAt,
+    (book) => book.downloadedAt && !book.uploadedAt && !isFeedBook(book),
   );
-  const booksToDownload = getVisibleLibrary().filter(
-    (book) => book.uploadedAt && !book.downloadedAt,
-  );
+  const booksToDownload = readestStorageActive
+    ? getVisibleLibrary().filter((book) => book.uploadedAt && !book.downloadedAt)
+    : [];
 
   const handleUploadAll = () => {
     booksToUpload.forEach((book) => queueUpload(book));
   };
 
   const handleDownloadAll = () => {
-    booksToDownload.forEach((book) => queueDownload(book));
+    // Background: a library-wide download must not toast once per book (#6418).
+    booksToDownload.forEach((book) => queueDownload(book, undefined, true));
   };
 
   const filteredTransfers = transfers
@@ -190,7 +225,7 @@ const TransferQueuePanel: React.FC = () => {
         case 'completed':
           return t.status === 'completed';
         case 'failed':
-          return t.status === 'failed' || t.status === 'cancelled';
+          return isFailedLikeTransfer(t) || t.status === 'cancelled';
         default:
           return true;
       }
@@ -231,7 +266,7 @@ const TransferQueuePanel: React.FC = () => {
         <div className='border-base-300 flex items-center justify-between border-b p-4'>
           <h2 className='text-lg font-semibold'>{_('Transfer Queue')}</h2>
           <div className='flex items-center gap-2'>
-            {booksToUpload.length > 0 && (
+            {uploadAllowed && booksToUpload.length > 0 && (
               <button
                 onClick={handleUploadAll}
                 className='btn btn-ghost btn-sm gap-1'
@@ -322,29 +357,31 @@ const TransferQueuePanel: React.FC = () => {
         </div>
 
         {/* Footer actions */}
-        <div className='border-base-300 flex items-center justify-between border-t p-4'>
-          <div className='flex items-center gap-2'>
-            {stats.failed > 0 && (
-              <button onClick={retryAllFailed} className='btn btn-ghost btn-sm gap-1'>
-                <MdRefresh size={iconSize - 2} />
-                {_('Retry All')}
-              </button>
-            )}
-          </div>
-          <div className='flex items-center gap-2'>
-            {stats.completed > 0 && (
-              <button onClick={clearCompleted} className='btn btn-ghost btn-sm gap-1'>
-                <MdDeleteSweep size={iconSize - 2} />
-                {_('Clear Completed')}
-              </button>
-            )}
-            {stats.failed > 0 && (
-              <button onClick={clearFailed} className='btn btn-ghost btn-sm gap-1'>
-                <MdDeleteSweep size={iconSize - 2} />
-                {_('Clear Failed')}
-              </button>
-            )}
-          </div>
+        <div className='border-base-300 flex flex-wrap items-center justify-evenly gap-2 border-t p-4'>
+          {stats.failed > 0 && (
+            <button onClick={retryAllFailed} className='btn btn-ghost btn-sm gap-1'>
+              <MdRefresh size={iconSize - 2} />
+              {_('Retry All')}
+            </button>
+          )}
+          {stats.pending > 0 && (
+            <button onClick={clearPending} className='btn btn-ghost btn-sm gap-1'>
+              <MdDeleteSweep size={iconSize - 2} />
+              {_('Clear Pending')}
+            </button>
+          )}
+          {stats.completed > 0 && (
+            <button onClick={clearCompleted} className='btn btn-ghost btn-sm gap-1'>
+              <MdDeleteSweep size={iconSize - 2} />
+              {_('Clear Completed')}
+            </button>
+          )}
+          {stats.failed > 0 && (
+            <button onClick={clearFailed} className='btn btn-ghost btn-sm gap-1'>
+              <MdDeleteSweep size={iconSize - 2} />
+              {_('Clear Failed')}
+            </button>
+          )}
         </div>
       </div>
     </div>

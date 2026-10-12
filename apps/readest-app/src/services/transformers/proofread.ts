@@ -1,5 +1,5 @@
 import * as CFI from 'foliate-js/epubcfi.js';
-import type { Transformer } from './types';
+import type { Transformer, TransformContext } from './types';
 import { ProofreadRule } from '@/types/book';
 import { useSettingsStore } from '@/store/settingsStore';
 
@@ -9,7 +9,32 @@ interface NormalizedPattern {
 }
 
 const isUnicodeWordChar = (char: string): boolean => /[\p{L}\p{N}_]/u.test(char || '');
+const isUnicodePunctuationOnly = (text: string): boolean =>
+  /^\p{P}+$/u.test(text) && !isUnicodeWordChar(text);
 const hasUnicodeChars = (text: string): boolean => /[^\x00-\x7F]/.test(text);
+
+// Scripts that don't use spaces between words (no word boundaries)
+// CJK: Chinese, Japanese, Korean
+// Thai, Lao, Khmer, Myanmar, Tibetan
+const NO_WORD_BOUNDARY_RANGES = [
+  '\u4E00-\u9FFF', // CJK Unified Ideographs
+  '\u3400-\u4DBF', // CJK Unified Ideographs Extension A
+  '\u3000-\u303F', // CJK Symbols and Punctuation
+  '\uFF00-\uFFEF', // Halfwidth and Fullwidth Forms
+  '\u3040-\u309F', // Hiragana
+  '\u30A0-\u30FF', // Katakana
+  '\uAC00-\uD7AF', // Korean Hangul Syllables
+  '\u0E00-\u0E7F', // Thai
+  '\u0E80-\u0EFF', // Lao
+  '\u1780-\u17FF', // Khmer
+  '\u1000-\u109F', // Myanmar
+  '\u0F00-\u0FFF', // Tibetan
+].join('');
+
+const isNoWordBoundaryChar = (char: string): boolean =>
+  new RegExp(`[${NO_WORD_BOUNDARY_RANGES}]`).test(char || '');
+const isPureNoWordBoundaryScript = (text: string): boolean =>
+  new RegExp(`^[${NO_WORD_BOUNDARY_RANGES}]+$`).test(text);
 
 function normalizePattern(
   pattern: string,
@@ -61,11 +86,23 @@ function isValidMatch(text: string, match: RegExpExecArray, rule: ProofreadRule)
     if (!isExactMatch) return false;
   }
 
-  if (hasUnicodeChars(rule.pattern)) {
+  // Unicode punctuation has no word boundary of its own. Inspect the matched
+  // text rather than the pattern so regex classes such as `[«»]` work without
+  // changing the established behavior for symbols, combining marks, or words.
+  // Scripts without word boundaries (CJK, Thai, Lao, Khmer, Myanmar, Tibetan)
+  // continue to use the existing adjacent-character exception below.
+  if (
+    hasUnicodeChars(rule.pattern) &&
+    !isUnicodePunctuationOnly(match[0]) &&
+    !isPureNoWordBoundaryScript(rule.pattern)
+  ) {
     const charBefore = text[match.index - 1] ?? '';
     const charAfter = text[match.index + match[0].length] ?? '';
-    if (isUnicodeWordChar(charBefore) || isUnicodeWordChar(charAfter)) {
-      return false;
+    // Only check word boundaries if adjacent chars are from scripts that use word boundaries
+    if (!isNoWordBoundaryChar(charBefore) && !isNoWordBoundaryChar(charAfter)) {
+      if (isUnicodeWordChar(charBefore) || isUnicodeWordChar(charAfter)) {
+        return false;
+      }
     }
   }
 
@@ -156,6 +193,27 @@ function applyReplacementSingle(
   }
 }
 
+// Spine step of a CFI: everything before the first indirection (`!`), or the
+// whole path for a section CFI, which has none. `sections[i].cfi` is
+// `epubcfi(/6/14)` and a selection made in it is `epubcfi(/6/14!/4/2,...)`.
+const cfiSpineStep = (cfi?: string): string | undefined =>
+  cfi?.match(/^epubcfi\((.*?)(?:!|\)$)/)?.[1];
+
+/**
+ * Whether a selection-scoped rule belongs to the section being transformed.
+ * The rule's own CFI names its spine item, so prefer that: `sectionHref` holds
+ * the TOC href at the reading position, which resolves to the nearest
+ * preceding nav entry and therefore names a different file whenever a spine
+ * item has no TOC entry of its own (#6148). Formats without spine CFIs
+ * (markdown, where section ids are the spine index) fall back to the href.
+ */
+const inThisSection = (rule: ProofreadRule, ctx: TransformContext): boolean => {
+  const ruleSpine = cfiSpineStep(rule.cfi);
+  const ctxSpine = cfiSpineStep(ctx.sectionCfi);
+  if (ruleSpine && ctxSpine) return ruleSpine === ctxSpine;
+  return ctx.sectionHref?.split('#')[0] === rule.sectionHref?.split('#')[0];
+};
+
 function getTextNodes(doc: Document): Text[] {
   const walker = document.createTreeWalker(doc.body || doc.documentElement, NodeFilter.SHOW_TEXT, {
     acceptNode: (node) => {
@@ -178,7 +236,12 @@ function getTextNodes(doc: Document): Text[] {
 export const proofreadTransformer: Transformer = {
   name: 'proofread',
 
-  transform: async (ctx) => {
+  transform: async (ctx, options) => {
+    const { docType = 'text/html', onlyForTTS = false } =
+      (options as {
+        docType?: DOMParserSupportedType;
+        onlyForTTS?: boolean;
+      }) || {};
     const globalRules = useSettingsStore.getState().settings?.globalViewSettings?.proofreadRules;
     const bookRules = ctx.viewSettings.proofreadRules;
     const merged = [...(globalRules ?? []), ...(bookRules ?? [])].sort(
@@ -187,7 +250,8 @@ export const proofreadTransformer: Transformer = {
     if (!merged.length) return ctx.content;
 
     const processed = merged
-      .filter((r) => r.enabled && r.pattern.trim())
+      .filter((r) => r.enabled && !r.deletedAt && r.pattern.trim())
+      .filter((r) => (onlyForTTS ? r.onlyForTTS : !r.onlyForTTS))
       .map((r) => ({
         ...r,
         normalizedPattern: normalizePattern(r.pattern, r.isRegex, r.caseSensitive !== false),
@@ -196,7 +260,7 @@ export const proofreadTransformer: Transformer = {
     if (!processed.length) return ctx.content;
 
     const parser = new DOMParser();
-    const doc = parser.parseFromString(ctx.content, 'text/html');
+    const doc = parser.parseFromString(ctx.content, docType);
     const textNodes = getTextNodes(doc);
 
     const byScope = {
@@ -208,11 +272,7 @@ export const proofreadTransformer: Transformer = {
     const ordered = [...byScope.selection, ...byScope.book, ...byScope.library];
 
     for (const rule of ordered) {
-      if (rule.scope === 'selection') {
-        const ruleBase = rule.sectionHref?.split('#')[0];
-        const ctxBase = ctx.sectionHref?.split('#')[0];
-        if (ctxBase !== ruleBase) continue;
-      }
+      if (rule.scope === 'selection' && !inThisSection(rule, ctx)) continue;
       if (rule.scope === 'selection') {
         applyReplacementSingle(doc, rule);
       } else {

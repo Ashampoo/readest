@@ -10,13 +10,14 @@ import { SettingsPanelPanelProp } from './SettingsDialog';
 import { saveViewSettings } from '@/helpers/settings';
 import { validateCSS, formatCSS } from '@/utils/css';
 import { getStyles } from '@/utils/style';
+import { BoxedList } from './primitives';
 
 type CSSType = 'book' | 'reader';
 
 const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }) => {
   const _ = useTranslation();
   const { appService, envConfig } = useEnv();
-  const { settings, isSettingsGlobal, setSettings } = useSettingsStore();
+  const { settings } = useSettingsStore();
   const { getView, getViewSettings, setViewSettings } = useReaderStore();
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
 
@@ -90,20 +91,10 @@ const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
       setDraftContentStylesheet(formattedCSS);
       setDraftContentStylesheetSaved(true);
       viewSettings.userStylesheet = formattedCSS;
-
-      if (isSettingsGlobal) {
-        settings.globalViewSettings.userStylesheet = formattedCSS;
-        setSettings(settings);
-      }
     } else {
       setDraftUIStylesheet(formattedCSS);
       setDraftUIStylesheetSaved(true);
       viewSettings.userUIStylesheet = formattedCSS;
-
-      if (isSettingsGlobal) {
-        settings.globalViewSettings.userUIStylesheet = formattedCSS;
-        setSettings(settings);
-      }
     }
 
     setViewSettings(bookKey, { ...viewSettings });
@@ -123,7 +114,7 @@ const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     e.nativeEvent.stopImmediatePropagation();
   };
 
-  const handleInputFocus = (textareaRef: React.RefObject<HTMLTextAreaElement>) => {
+  const handleInputFocus = (textareaRef: React.RefObject<HTMLTextAreaElement | null>) => {
     if (appService?.isAndroidApp) {
       setInputFocusInAndroid(true);
     }
@@ -150,20 +141,20 @@ const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     value: string,
     error: string | null,
     saved: boolean,
-    textareaRef: React.RefObject<HTMLTextAreaElement>,
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>,
+    settingId?: string,
   ) => (
     <div className='w-full'>
-      <h2 className='mb-2 font-medium' aria-label={_(title)}>
-        {_(title)}
-      </h2>
-      <div
-        className={`card border-base-200 bg-base-100 border shadow ${error ? 'border-red-500' : ''}`}
-      >
-        <div className='relative p-1'>
+      <BoxedList title={_(title)} data-setting-id={settingId} innerClassName='ps-0!'>
+        {/* Single full-width child instead of typical settings rows — the
+            textarea owns the whole card surface. Apply button overlays at
+            the bottom-trailing corner; visible only when there are unsaved
+            edits and no validation error. */}
+        <div className={clsx('relative p-1', error && 'ring-error/60 rounded-2xl ring-1')}>
           <textarea
             ref={textareaRef}
             className={clsx(
-              'textarea textarea-ghost h-48 w-full border-0 p-3 text-base !outline-none sm:text-sm',
+              'textarea textarea-ghost h-48 w-full border-0 p-3 text-base outline-hidden! sm:text-sm',
               'placeholder:text-base-content/70',
             )}
             placeholder={_(placeholder)}
@@ -178,9 +169,12 @@ const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
           />
           <button
             className={clsx(
-              'btn btn-ghost bg-base-200 absolute bottom-2 right-4 h-8 min-h-8 px-4 py-2',
-              saved ? 'hidden' : '',
-              error ? 'btn-disabled' : '',
+              'hover:bg-base-300 bg-base-200 absolute bottom-2 end-4 h-8 items-center rounded-md px-3 text-xs font-medium transition-colors duration-150',
+              'focus-visible:ring-base-content/15 focus-visible:outline-hidden focus-visible:ring-2',
+              // Tailwind 4 orders `inline-flex` after `hidden`, so the display
+              // must be exclusive rather than an override.
+              saved ? 'hidden' : 'inline-flex',
+              error ? 'pointer-events-none opacity-50' : '',
             )}
             onClick={() => applyStyles(type)}
             disabled={!!error}
@@ -188,8 +182,8 @@ const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
             {_('Apply')}
           </button>
         </div>
-      </div>
-      {error && <p className='mt-1 text-sm text-red-500'>{error}</p>}
+      </BoxedList>
+      {error && <p className='text-error mt-1 ps-4 text-sm'>{error}</p>}
     </div>
   );
 
@@ -208,6 +202,7 @@ const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
         contentError,
         draftContentStylesheetSaved,
         contentTextareaRef,
+        'settings.custom.contentCss',
       )}
 
       {renderCSSEditor(
@@ -218,6 +213,7 @@ const MiscPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
         uiError,
         draftUIStylesheetSaved,
         uiTextareaRef,
+        'settings.custom.readerUiCss',
       )}
     </div>
   );

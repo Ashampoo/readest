@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { UI_FEATURES } from '@/services/featureFlags';
 import Stripe from 'stripe';
 import { loadStripe, Stripe as StripeClient } from '@stripe/stripe-js';
 import { getAPIBaseUrl, isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
@@ -6,7 +7,6 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { getAccessToken } from '@/utils/access';
 import { StripeProductMetadata } from '@/types/payment';
 import { AvailablePlan, PlanType } from '@/types/quota';
-import { UI_FEATURES } from '@/services/constants';
 
 let stripePromise: Promise<StripeClient | null>;
 
@@ -40,7 +40,7 @@ export type StripeAvailablePlan = AvailablePlan & {
 export const fetchStripePlans = async () => {
   const response = await fetch(WEB_STRIPE_PLANS_URL);
   const data = await response.json();
-  return data && data instanceof Array ? data : [];
+  return data && Array.isArray(data) ? data : [];
 };
 
 export const createStripeCheckoutSession = async (
@@ -60,34 +60,36 @@ export const createStripeCheckoutSession = async (
   });
 
   if (!response.ok) {
-    throw new Error('Failed to create Stripe checkout session');
+    const detail = await response
+      .json()
+      .then((data) => data?.message as string | undefined)
+      .catch(() => undefined);
+    throw new Error(detail || 'Failed to create Stripe checkout session');
   }
 
   return response.json();
 };
 
-export const redirectToStripeCheckout = async (sessionId?: string, url?: string): Promise<void> => {
+export const redirectToStripeCheckout = async (url?: string): Promise<void> => {
   if (url) {
     if (isWebAppPlatform()) {
       window.location.href = url;
     } else if (isTauriAppPlatform()) {
       await openUrl(url);
     }
-  } else if (sessionId) {
-    const stripe = await getStripe();
-    if (!stripe) {
-      throw new Error('Stripe not loaded');
-    }
-    const result = await stripe.redirectToCheckout({ sessionId });
-    if (result.error) {
-      throw result.error;
-    }
   } else {
-    throw new Error('No sessionId or url returned from checkout API');
+    throw new Error('No checkout URL returned from the Stripe API');
   }
 };
 
-export const createStripePortalSession = async () => {
+/**
+ * `subscription_update` deep-links the portal to its plan picker, which is how
+ * an existing subscriber changes billing period without stacking a second
+ * subscription.
+ */
+export type StripePortalFlow = 'subscription_update';
+
+export const createStripePortalSession = async (flow?: StripePortalFlow) => {
   const token = await getAccessToken();
 
   const response = await fetch(WEB_STRIPE_PORTAL_URL, {
@@ -96,6 +98,7 @@ export const createStripePortalSession = async () => {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify(flow ? { flow } : {}),
   });
 
   const data = await response.json();
@@ -117,9 +120,7 @@ export const redirectToStripePortal = async (url: string): Promise<void> => {
 
 export const handleStripeCheckoutError = (error: string) => {
   console.error(error);
-  if (UI_FEATURES.telemetry) {
-    posthog.capture('checkout_error', { error });
-  }
+  if (UI_FEATURES.telemetry) posthog.capture('checkout_error', { error });
 };
 
 export const getSubscriptionSuccessUrl = (sessionId: string) => {

@@ -15,6 +15,81 @@ export interface ProgressPayload {
 
 export type ProgressHandler = (progress: ProgressPayload) => void;
 
+/**
+ * Percentage sentinel for "running, but the byte total is unknown". Chunked
+ * responses, buffered fallbacks and queued-but-not-started transfers have no
+ * total to divide by; reporting 0 there renders as a frozen 0%, so progress
+ * surfaces render this as an indeterminate state instead.
+ */
+export const INDETERMINATE_PROGRESS = -1;
+
+/** Bytes to a 0-100 percentage, or {@link INDETERMINATE_PROGRESS}. */
+export const toProgressPercent = (progress: ProgressPayload): number =>
+  progress.total > 0 ? (progress.progress / progress.total) * 100 : INDETERMINATE_PROGRESS;
+
+export interface ProgressThrottle {
+  /** Record a progress payload, emitting at most once per interval. */
+  push: (progress: ProgressPayload) => void;
+  /** Emit any pending payload immediately (e.g. when the transfer finishes). */
+  flush: () => void;
+  /** Drop any pending payload and clear the trailing timer. */
+  cancel: () => void;
+}
+
+/**
+ * Coalesce high-frequency progress emissions to at most one per `intervalMs`
+ * (leading + trailing edges). Web and native download streams call onProgress
+ * once per chunk, often as a dense microtask burst for already-buffered sources
+ * (`while (true) { await reader.read(); onProgress(...) }`), and `transferSpeed`
+ * is recomputed from wall-clock time on every call. Emitting each one churns the
+ * transfer store per chunk and sustains a synchronous React update storm past
+ * the nested-update limit (Sentry READEST-2). Throttling caps store writes and
+ * defers the trailing emit to a macrotask, so the render fan-out cannot loop.
+ */
+export const createProgressThrottle = (
+  emit: (progress: ProgressPayload) => void,
+  intervalMs: number,
+): ProgressThrottle => {
+  let lastEmit = Number.NEGATIVE_INFINITY;
+  let pending: ProgressPayload | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const fire = () => {
+    timer = null;
+    if (!pending) return;
+    const payload = pending;
+    pending = null;
+    lastEmit = Date.now();
+    emit(payload);
+  };
+
+  return {
+    push: (progress) => {
+      pending = progress;
+      const elapsed = Date.now() - lastEmit;
+      if (elapsed >= intervalMs) {
+        fire();
+      } else if (timer === null) {
+        timer = setTimeout(fire, intervalMs - elapsed);
+      }
+    },
+    flush: () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      fire();
+    },
+    cancel: () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      pending = null;
+    },
+  };
+};
+
 export const webUpload = (file: File, uploadUrl: string, onProgress?: ProgressHandler) => {
   return new Promise<void>((resolve, reject) => {
     const startTime = Date.now();
@@ -61,11 +136,14 @@ export const webDownload = async (
     throw new Error(UploadFileError.DownloadFailed);
   }
 
+  const responseHeaders = Object.fromEntries(response.headers.entries());
   const contentLength =
     response.headers.get('Content-Length') || response.headers.get('X-Content-Length');
-  if (!contentLength) throw new Error('Cannot track progress: Content-Length missing');
-
-  const totalSize = parseInt(contentLength, 10);
+  // R2/S3 signed URLs frequently don't expose Content-Length over CORS, so
+  // missing length is common in the wild. Fall back to indeterminate
+  // progress (total=0) instead of failing the download. UI callers already
+  // guard `total === 0` to skip percentage updates.
+  const totalSize = parseInt(contentLength || '0', 10);
   let receivedSize = 0;
   const reader = response.body!.getReader();
   const chunks: Uint8Array[] = [];
@@ -87,7 +165,7 @@ export const webDownload = async (
     }
   }
 
-  return new Blob(chunks as BlobPart[]);
+  return { headers: responseHeaders, blob: new Blob(chunks as BlobPart[]) };
 };
 
 export const tauriUpload = async (
@@ -123,7 +201,8 @@ export const tauriDownload = async (
   headers?: Record<string, string>,
   body?: string,
   singleThreaded?: boolean,
-): Promise<void> => {
+  skipSslVerification?: boolean,
+): Promise<Record<string, string>> => {
   const ids = new Uint32Array(1);
   window.crypto.getRandomValues(ids);
   const id = ids[0];
@@ -133,7 +212,7 @@ export const tauriDownload = async (
     onProgress.onmessage = progressHandler;
   }
 
-  await invoke('download_file', {
+  const responseHeaders = await invoke<Record<string, string>>('download_file', {
     id,
     url,
     filePath,
@@ -141,5 +220,7 @@ export const tauriDownload = async (
     onProgress,
     body,
     singleThreaded,
+    skipSslVerification,
   });
+  return responseHeaders;
 };

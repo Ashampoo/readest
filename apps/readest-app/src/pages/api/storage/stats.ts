@@ -31,23 +31,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const supabase = createSupabaseAdminClient();
 
-    // Get total file count and size
-    const { data: totalStats, error: totalError } = await supabase
-      .from('files')
-      .select('file_size')
-      .eq('user_id', user.id)
-      .is('deleted_at', null);
+    // Get total file count and size (paginated to avoid Supabase 1000 row limit)
+    const PAGE_SIZE = 1000;
+    let allFileStats: { file_size: number }[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    if (totalError) {
-      console.error('Error querying total stats:', totalError);
-      return res.status(500).json({ error: 'Failed to retrieve storage statistics' });
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('files')
+        .select('file_size')
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (error) {
+        console.error('Error querying total stats:', error);
+        return res.status(500).json({ error: 'Failed to retrieve storage statistics' });
+      }
+
+      if (data && data.length > 0) {
+        allFileStats = allFileStats.concat(data);
+        offset += PAGE_SIZE;
+        hasMore = data.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
     }
 
-    const totalFiles = totalStats?.length || 0;
-    const totalSize = totalStats?.reduce((sum, file) => sum + (file.file_size || 0), 0) || 0;
+    const totalFiles = allFileStats.length;
+    const totalSize = allFileStats.reduce((sum, file) => sum + (file.file_size || 0), 0);
 
-    // Get storage plan data
-    const { usage, quota } = getStoragePlanData(token);
+    // `quota` is an entitlement and is fine to read from the token. `usage`
+    // there is a claim frozen at token-mint time, so reporting it would show a
+    // figure that disagrees with the totalSize this endpoint just summed from
+    // the files table. Report the live sum.
+    const { quota } = getStoragePlanData(token);
+    const usage = totalSize;
     const usagePercentage = quota > 0 ? Math.round((usage / quota) * 100) : 0;
 
     // Get stats grouped by book_hash
@@ -62,13 +82,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (bookHashError) {
       console.warn('RPC function not available, using fallback aggregation:', bookHashError);
 
-      const { data: allFiles, error: filesError } = await supabase
-        .from('files')
-        .select('book_hash, file_size')
-        .eq('user_id', user.id)
-        .is('deleted_at', null);
+      let allFiles: { book_hash: string | null; file_size: number }[] = [];
+      let fallbackOffset = 0;
+      let fallbackHasMore = true;
 
-      if (!filesError && allFiles) {
+      while (fallbackHasMore) {
+        const { data, error: filesError } = await supabase
+          .from('files')
+          .select('book_hash, file_size')
+          .eq('user_id', user.id)
+          .is('deleted_at', null)
+          .range(fallbackOffset, fallbackOffset + PAGE_SIZE - 1);
+
+        if (filesError) break;
+
+        if (data && data.length > 0) {
+          allFiles = allFiles.concat(data);
+          fallbackOffset += PAGE_SIZE;
+          fallbackHasMore = data.length === PAGE_SIZE;
+        } else {
+          fallbackHasMore = false;
+        }
+      }
+
+      if (allFiles.length > 0) {
         const grouped = new Map<string | null, { count: number; size: number }>();
 
         allFiles.forEach((file) => {

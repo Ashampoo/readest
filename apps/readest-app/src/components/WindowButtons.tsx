@@ -3,15 +3,17 @@ import React, { useEffect, useRef } from 'react';
 import { useEnv } from '@/context/EnvContext';
 
 import { tauriHandleMinimize, tauriHandleToggleMaximize, tauriHandleClose } from '@/utils/window';
-import { isTauriAppPlatform } from '@/services/environment';
+import { isTauriAppPlatform, needsPointerWindowControls } from '@/services/environment';
+import { startPointerWindowMove } from '@/utils/windowPointerDrag';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface WindowButtonsProps {
   className?: string;
-  headerRef?: React.RefObject<HTMLDivElement>;
+  headerRef?: React.RefObject<HTMLElement | null>;
   showMinimize?: boolean;
   showMaximize?: boolean;
   showClose?: boolean;
+  closeButtonLabel?: string;
   onMinimize?: () => void;
   onToggleMaximize?: () => void;
   onClose?: () => void;
@@ -41,6 +43,7 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
   showMinimize = true,
   showMaximize = true,
   showClose = true,
+  closeButtonLabel,
   onMinimize,
   onToggleMaximize,
   onClose,
@@ -75,6 +78,8 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
     if (e.buttons === 1) {
       if (e.detail === 2) {
         getCurrentWindow().toggleMaximize();
+      } else if (needsPointerWindowControls()) {
+        startPointerWindowMove(e);
       } else {
         getCurrentWindow().startDragging();
       }
@@ -144,7 +149,7 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
   };
 
   useEffect(() => {
-    if (!isTauriAppPlatform()) return;
+    if (!isTauriAppPlatform() || !appService?.hasWindowBar) return;
     const headerElement = headerRef?.current;
     if (!headerElement) return;
 
@@ -162,7 +167,7 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
       headerElement.removeEventListener('pointercancel', handlePointerUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [appService?.hasWindowBar, headerRef]);
 
   const handleMinimize = async () => {
     if (onMinimize) {
@@ -218,7 +223,11 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
       )}
 
       {showClose && (appService?.hasWindowBar || onClose) && (
-        <WindowButton onClick={handleClose} label={_('Close')} id='titlebar-close'>
+        <WindowButton
+          onClick={handleClose}
+          label={closeButtonLabel || _('Close')}
+          id='titlebar-close'
+        >
           <svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'>
             <path
               fill='currentColor'

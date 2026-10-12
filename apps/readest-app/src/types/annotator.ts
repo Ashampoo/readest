@@ -1,10 +1,12 @@
 export type AnnotationToolType =
   | 'copy'
+  | 'copylink'
   | 'highlight'
   | 'annotate'
   | 'search'
   | 'dictionary'
-  | 'wikipedia'
   | 'translate'
   | 'tts'
-  | 'proofread';
+  | 'proofread'
+  | 'share'
+  | 'quotecard';

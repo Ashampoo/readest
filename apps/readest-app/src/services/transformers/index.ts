@@ -7,8 +7,12 @@ import { sanitizerTransformer } from './sanitizer';
 import { simpleccTransformer } from './simplecc';
 import { styleTransformer } from './style';
 import { proofreadTransformer } from './proofread';
+import { warichuTransformer } from './warichu';
+import { nbspTransformer } from './nbsp';
+import { epubSwitchTransformer } from './epubSwitch';
 
 export const availableTransformers: Transformer[] = [
+  epubSwitchTransformer,
   punctuationTransformer,
   footnoteTransformer,
   languageTransformer,
@@ -16,6 +20,8 @@ export const availableTransformers: Transformer[] = [
   whitespaceTransformer,
   sanitizerTransformer,
   simpleccTransformer,
+  nbspTransformer,
   proofreadTransformer,
+  warichuTransformer,
   // Add more transformers here
 ];

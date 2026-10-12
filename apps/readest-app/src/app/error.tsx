@@ -5,15 +5,15 @@ import { useEffect, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { parseWebViewInfo } from '@/utils/ua';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { handleGlobalError } from '@/utils/error';
-import { UI_FEATURES } from '@/services/constants';
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
-export default function Error({ error, reset }: ErrorPageProps) {
+export default function ErrorPage({ error, reset }: ErrorPageProps) {
   const _ = useTranslation();
   const { appService } = useEnv();
   const [browserInfo, setBrowserInfo] = useState('');
@@ -23,9 +23,7 @@ export default function Error({ error, reset }: ErrorPageProps) {
   }, [appService]);
 
   useEffect(() => {
-    if (UI_FEATURES.telemetry) {
-      posthog.captureException(error);
-    }
+    if (UI_FEATURES.telemetry) posthog.captureException(error);
     handleGlobalError(error);
   }, [appService, error]);
 

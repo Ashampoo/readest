@@ -1,21 +1,22 @@
 import clsx from 'clsx';
 import React from 'react';
-import Image from 'next/image';
 
 import { MdCheck } from 'react-icons/md';
-import { setAboutDialogVisible } from '@/components/AboutWindow';
+import { useEnv } from '@/context/EnvContext';
+import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useSidebarStore } from '@/store/sidebarStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useParallelViewStore } from '@/store/parallelViewStore';
-import { isWebAppPlatform } from '@/services/environment';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { eventDispatcher } from '@/utils/event';
-import { DOWNLOAD_READEST_URL, UI_FEATURES } from '@/services/constants';
-import { setKOSyncSettingsWindowVisible } from '@/app/reader/components/KOSyncSettings';
-import { setProofreadRulesVisibility } from '@/app/reader/components/ProofreadRules';
+import { canPairAudiobook } from '@/utils/audiobook';
 import { FIXED_LAYOUT_FORMATS } from '@/types/book';
+import { saveViewSettings } from '@/helpers/settings';
+import { setProofreadRulesVisibility } from '@/app/reader/components/ProofreadRules';
+import { setAboutDialogVisible } from '@/components/AboutWindow';
 import useBooksManager from '../../hooks/useBooksManager';
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
@@ -27,15 +28,30 @@ interface BookMenuProps {
 
 const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen }) => {
   const _ = useTranslation();
+  const { envConfig } = useEnv();
   const { settings } = useSettingsStore();
-  const { bookKeys, getViewSettings, setViewSettings } = useReaderStore();
+  const { bookKeys, recreateViewer, getViewSettings } = useReaderStore();
   const { getVisibleLibrary } = useLibraryStore();
   const { openParallelView } = useBooksManager();
   const { sideBarBookKey } = useSidebarStore();
+  const { getConfig, getBookData } = useBookDataStore();
   const { parallelViews, setParallel, unsetParallel } = useParallelViewStore();
   const viewSettings = getViewSettings(sideBarBookKey!);
+  const bookData = sideBarBookKey ? getBookData(sideBarBookKey) : null;
+  const showPairAudiobook = canPairAudiobook(bookData);
 
   const [isSortedTOC, setIsSortedTOC] = React.useState(viewSettings?.sortedTOC || false);
+
+  // Used purely to grey out "Clear Annotations" when there's nothing to
+  // clear. The actual delete + confirm dialog lives in Annotator (which
+  // outlives this dropdown menu, so the dialog isn't unmounted along
+  // with the menu when the user clicks the entry).
+  const annotationsToClear = React.useMemo(() => {
+    if (!sideBarBookKey) return 0;
+    const cfg = getConfig(sideBarBookKey);
+    if (!cfg?.booknotes) return 0;
+    return cfg.booknotes.filter((n) => n.type === 'annotation' && !n.deletedAt).length;
+  }, [sideBarBookKey, getConfig]);
 
   const handleParallelView = (id: string) => {
     openParallelView(id);
@@ -49,23 +65,24 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
     setAboutDialogVisible(true);
     setIsDropdownOpen?.(false);
   };
-  const downloadReadest = () => {
-    window.open(DOWNLOAD_READEST_URL, '_blank');
-    setIsDropdownOpen?.(false);
-  };
   const handleExportAnnotations = () => {
     eventDispatcher.dispatch('export-annotations', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const handleImportAnnotations = () => {
+    eventDispatcher.dispatch('import-annotations', { bookKey: sideBarBookKey });
     setIsDropdownOpen?.(false);
   };
   const handleToggleSortTOC = () => {
     setIsSortedTOC((prev) => !prev);
     setIsDropdownOpen?.(false);
     if (sideBarBookKey) {
-      const viewSettings = getViewSettings(sideBarBookKey)!;
-      viewSettings.sortedTOC = !isSortedTOC;
-      setViewSettings(sideBarBookKey, viewSettings);
+      saveViewSettings(envConfig, sideBarBookKey, 'sortedTOC', !isSortedTOC, true, false).then(
+        () => {
+          recreateViewer(envConfig, sideBarBookKey);
+        },
+      );
     }
-    setTimeout(() => window.location.reload(), 100);
   };
   const handleSetParallel = () => {
     setParallel(bookKeys);
@@ -75,40 +92,75 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
     unsetParallel(bookKeys);
     setIsDropdownOpen?.(false);
   };
-  const showKoSyncSettingsWindow = () => {
-    setKOSyncSettingsWindowVisible(true);
-    setIsDropdownOpen?.(false);
-  };
   const showProofreadRulesWindow = () => {
     setProofreadRulesVisibility(true);
     setIsDropdownOpen?.(false);
   };
-  const handlePullKOSync = () => {
-    eventDispatcher.dispatch('pull-kosync', { bookKey: sideBarBookKey });
+  // `provider` addresses one sync backend: KOSync and BookOrbit speak the same
+  // protocol through the same hook and would otherwise both answer.
+  const handlePullKOSync = (provider: 'kosync' | 'bookorbit') => () => {
+    eventDispatcher.dispatch('pull-kosync', { bookKey: sideBarBookKey, provider });
     setIsDropdownOpen?.(false);
   };
-  const handlePushKOSync = () => {
-    eventDispatcher.dispatch('push-kosync', { bookKey: sideBarBookKey });
+  const handlePushKOSync = (provider: 'kosync' | 'bookorbit') => () => {
+    eventDispatcher.dispatch('push-kosync', { bookKey: sideBarBookKey, provider });
+    setIsDropdownOpen?.(false);
+  };
+  const handlePushReadwise = () => {
+    eventDispatcher.dispatch('readwise-push-all', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const handlePushNotion = () => {
+    eventDispatcher.dispatch('notion-push-all', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const handlePushHardcoverNotes = () => {
+    eventDispatcher.dispatch('hardcover-push-notes', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const handlePushHardcoverProgress = () => {
+    eventDispatcher.dispatch('hardcover-push-progress', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  // Hosted by ReaderContent (like the audiobook dialog) so the picker
+  // outlives this dropdown.
+  const handleLinkHardcoverBook = () => {
+    eventDispatcher.dispatch('hardcover-link-book', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const hardcoverLink = sideBarBookKey ? getConfig(sideBarBookKey)?.hardcover : undefined;
+  const handlePushPageboundProgress = () => {
+    eventDispatcher.dispatch('pagebound-push-progress', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const handleLinkPageboundBook = () => {
+    eventDispatcher.dispatch('pagebound-link-book', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const pageboundLink = sideBarBookKey ? getConfig(sideBarBookKey)?.pagebound : undefined;
+  const pageboundEnabled = !!(settings.pagebound?.enabled && settings.pagebound.refreshToken);
+  const bookOrbitProgressSync = settings.bookorbit.enabled && settings.bookorbit.syncProgress;
+  // Routed through Annotator (per-book, long-lived) so that the
+  // confirmation dialog isn't unmounted with the dropdown menu.
+  const handleClearAnnotations = () => {
+    eventDispatcher.dispatch('clear-annotations', { bookKey: sideBarBookKey });
+    setIsDropdownOpen?.(false);
+  };
+  const handleManageAudiobook = () => {
+    eventDispatcher.dispatch('manage-audiobook', { bookKey: sideBarBookKey });
     setIsDropdownOpen?.(false);
   };
 
   return (
     <Menu
-      className={clsx('book-menu dropdown-content border-base-100 z-20 shadow-2xl', menuClassName)}
+      className={clsx('book-menu dropdown-content z-20 shadow-2xl', menuClassName)}
       onCancel={() => setIsDropdownOpen?.(false)}
     >
       <MenuItem
         label={_('Parallel Read')}
         buttonClass={bookKeys.length > 1 ? 'lg:tooltip lg:tooltip-bottom' : ''}
-        tooltip={parallelViews.length > 0 ? _('Disable') : bookKeys.length > 1 ? _('Enable') : ''}
+        tooltip={parallelViews.length > 0 ? _('Disable') : _('Enable')}
         Icon={parallelViews.length > 0 && bookKeys.length > 1 ? MdCheck : undefined}
-        onClick={
-          parallelViews.length > 0
-            ? handleUnsetParallel
-            : bookKeys.length > 1
-              ? handleSetParallel
-              : undefined
-        }
       >
         <ul className='max-h-60 overflow-y-auto'>
           {getVisibleLibrary()
@@ -119,12 +171,12 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
               <MenuItem
                 key={book.hash}
                 Icon={
-                  <Image
+                  <img
                     src={book.coverImageUrl!}
                     alt={book.title}
                     width={56}
                     height={80}
-                    className='aspect-auto max-h-8 max-w-4 rounded-sm shadow-md'
+                    className='aspect-auto max-h-8 max-w-4 rounded-xs shadow-md'
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
@@ -143,32 +195,96 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
         ) : (
           <MenuItem label={_('Enter Parallel Read')} onClick={handleSetParallel} />
         ))}
-      {UI_FEATURES.kosync && (
-        <>
-          <hr className='border-base-200 my-1' />
-          <MenuItem label={_('KOReader Sync')} onClick={showKoSyncSettingsWindow} />
-          {settings.kosync.enabled && (
-            <>
-              <MenuItem label={_('Push Progress')} onClick={handlePushKOSync} />
-              <MenuItem label={_('Pull Progress')} onClick={handlePullKOSync} />
-            </>
-          )}
-        </>
+      {((UI_FEATURES.kosync && settings.kosync.enabled) ||
+        (UI_FEATURES.kosync && bookOrbitProgressSync) ||
+        settings.readwise.enabled ||
+        settings.hardcover.enabled ||
+        pageboundEnabled ||
+        (settings.notion.enabled && settings.notion.accessToken && settings.notion.databaseId)) && (
+        <hr aria-hidden='true' className='border-base-200 my-1' />
       )}
-      <hr className='border-base-200 my-1' />
+      {UI_FEATURES.kosync && settings.kosync.enabled && (
+        <MenuItem label={_('KOReader Sync')} detailsOpen={false} buttonClass='py-2'>
+          <ul className='flex flex-col ps-1'>
+            <MenuItem label={_('Push Progress')} noIcon onClick={handlePushKOSync('kosync')} />
+            <MenuItem label={_('Pull Progress')} noIcon onClick={handlePullKOSync('kosync')} />
+          </ul>
+        </MenuItem>
+      )}
+      {UI_FEATURES.kosync && bookOrbitProgressSync && (
+        <MenuItem label={_('BookOrbit Sync')} detailsOpen={false} buttonClass='py-2'>
+          <ul className='flex flex-col ps-1'>
+            <MenuItem label={_('Push Progress')} noIcon onClick={handlePushKOSync('bookorbit')} />
+            <MenuItem label={_('Pull Progress')} noIcon onClick={handlePullKOSync('bookorbit')} />
+          </ul>
+        </MenuItem>
+      )}
+      {settings.readwise.enabled && (
+        <MenuItem label={_('Readwise Sync')} detailsOpen={false} buttonClass='py-2'>
+          <ul className='flex flex-col ps-1'>
+            <MenuItem label={_('Push Highlights')} noIcon onClick={handlePushReadwise} />
+          </ul>
+        </MenuItem>
+      )}
+      {settings.notion.enabled && settings.notion.accessToken && settings.notion.databaseId && (
+        <MenuItem label={_('Notion Sync')} detailsOpen={false} buttonClass='py-2'>
+          <ul className='flex flex-col ps-1'>
+            <MenuItem label={_('Push Notes')} noIcon onClick={handlePushNotion} />
+          </ul>
+        </MenuItem>
+      )}
+      {settings.hardcover.enabled && (
+        <MenuItem label={_('Hardcover Sync')} detailsOpen={false} buttonClass='py-2'>
+          <ul className='flex flex-col ps-1'>
+            <MenuItem label={_('Push Progress')} noIcon onClick={handlePushHardcoverProgress} />
+            <MenuItem label={_('Push Notes')} noIcon onClick={handlePushHardcoverNotes} />
+            <MenuItem
+              label={_('Link Book')}
+              description={hardcoverLink?.title}
+              noIcon
+              onClick={handleLinkHardcoverBook}
+            />
+          </ul>
+        </MenuItem>
+      )}
+      {pageboundEnabled && (
+        <MenuItem label={_('Pagebound Sync')} detailsOpen={false} buttonClass='py-2'>
+          <ul className='flex flex-col ps-1'>
+            <MenuItem label={_('Push Progress')} noIcon onClick={handlePushPageboundProgress} />
+            <MenuItem
+              label={_('Link Book')}
+              description={pageboundLink?.title}
+              noIcon
+              onClick={handleLinkPageboundBook}
+            />
+          </ul>
+        </MenuItem>
+      )}
+      <hr aria-hidden='true' className='border-base-200 my-1' />
       <MenuItem label={_('Proofread')} onClick={showProofreadRulesWindow} />
-      <hr className='border-base-200 my-1' />
+      {showPairAudiobook && (
+        <MenuItem
+          label={
+            getConfig(sideBarBookKey!)?.audiobook ? _('Manage Audiobook') : _('Pair Audiobook')
+          }
+          onClick={handleManageAudiobook}
+        />
+      )}
+      <hr aria-hidden='true' className='border-base-200 my-1' />
       <MenuItem label={_('Export Annotations')} onClick={handleExportAnnotations} />
+      <MenuItem label={_('Import Annotations')} onClick={handleImportAnnotations} />
+      <MenuItem
+        label={_('Clear Annotations')}
+        disabled={annotationsToClear === 0}
+        onClick={handleClearAnnotations}
+      />
       <MenuItem
         label={_('Sort TOC by Page')}
         Icon={isSortedTOC ? MdCheck : undefined}
         onClick={handleToggleSortTOC}
       />
       <MenuItem label={_('Reload Page')} shortcut='Shift+R' onClick={handleReloadPage} />
-      <hr className='border-base-200 my-1' />
-      {isWebAppPlatform() && (
-        <MenuItem label={_('Download Ashampoo E-Book Reader')} onClick={downloadReadest} />
-      )}
+      <hr aria-hidden='true' className='border-base-200 my-1' />
       <MenuItem label={_('About Ashampoo E-Book Reader')} onClick={showAboutReadest} />
     </Menu>
   );
