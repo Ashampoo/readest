@@ -35,6 +35,7 @@ import { CatalogManager } from '@/app/opds/components/CatalogManager';
 import { saveSysSettings } from '@/helpers/settings';
 import { isCloudSyncAllowed } from '@/utils/access';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
+import { UI_FEATURES } from '@/services/featureFlags';
 import {
   getLocalSendAlias,
   isLocalSendEnabled,
@@ -212,6 +213,25 @@ const IntegrationsPanel: React.FC = () => {
   // stick to the next open. Recognised values match the SubPage union.
   useEffect(() => {
     if (!requestedSubPage) return;
+    const kosyncRequest = requestedSubPage === 'kosync' || requestedSubPage === 'bookorbit';
+    const catalogRequest = requestedSubPage === 'opds' || requestedSubPage === 'audiobookshelf';
+    const cloudRequest =
+      requestedSubPage === 'webdav' ||
+      requestedSubPage === 'gdrive' ||
+      requestedSubPage === 's3' ||
+      requestedSubPage === 'onedrive' ||
+      requestedSubPage === 'icloud' ||
+      requestedSubPage === 'cloudsync' ||
+      requestedSubPage === 'readest-cloud' ||
+      requestedSubPage === 'send';
+    if (
+      (kosyncRequest && !UI_FEATURES.kosync) ||
+      (catalogRequest && !UI_FEATURES.opds) ||
+      (cloudRequest && !UI_FEATURES.auth)
+    ) {
+      setRequestedSubPage(null);
+      return;
+    }
     const isCloudRequest =
       requestedSubPage === 'webdav' ||
       requestedSubPage === 'gdrive' ||
@@ -255,25 +275,39 @@ const IntegrationsPanel: React.FC = () => {
   // SubPageHeader's "Integrations" label lands at the exact same Y position
   // as the list-view's h2 — clicking a row reads as a navigation morph
   // rather than a layout shift.
-  if (subPage === 'kosync')
+  const visibleSubPage =
+    ((subPage === 'kosync' || subPage === 'bookorbit') && !UI_FEATURES.kosync) ||
+    ((subPage === 'opds' || subPage === 'audiobookshelf') && !UI_FEATURES.opds) ||
+    ((subPage === 'webdav' ||
+      subPage === 'gdrive' ||
+      subPage === 's3' ||
+      subPage === 'onedrive' ||
+      subPage === 'icloud' ||
+      subPage === 'readest-cloud' ||
+      subPage === 'send') &&
+      !UI_FEATURES.auth)
+      ? null
+      : subPage;
+
+  if (visibleSubPage === 'kosync')
     return (
       <div className='my-4 w-full'>
         <KOSyncForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'localsend')
+  if (visibleSubPage === 'localsend')
     return (
       <div className='my-4 w-full'>
         <LocalSendForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'bookorbit')
+  if (visibleSubPage === 'bookorbit')
     return (
       <div className='my-4 w-full'>
         <BookOrbitForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'webdav')
+  if (visibleSubPage === 'webdav')
     return (
       <div className='my-4 w-full'>
         <SubPageHeader
@@ -303,7 +337,7 @@ const IntegrationsPanel: React.FC = () => {
         )}
       </div>
     );
-  if (subPage === 'gdrive')
+  if (visibleSubPage === 'gdrive')
     return (
       <div className='my-4 w-full'>
         <SubPageHeader
@@ -333,7 +367,7 @@ const IntegrationsPanel: React.FC = () => {
         )}
       </div>
     );
-  if (subPage === 's3')
+  if (visibleSubPage === 's3')
     return (
       <div className='my-4 w-full'>
         <SubPageHeader
@@ -377,7 +411,7 @@ const IntegrationsPanel: React.FC = () => {
         </div>
       </div>
     );
-  if (subPage === 'onedrive')
+  if (visibleSubPage === 'onedrive')
     return (
       <div className='my-4 w-full'>
         <SubPageHeader
@@ -407,7 +441,7 @@ const IntegrationsPanel: React.FC = () => {
         )}
       </div>
     );
-  if (subPage === 'icloud')
+  if (visibleSubPage === 'icloud')
     return (
       <div className='my-4 w-full'>
         <SubPageHeader
@@ -437,7 +471,7 @@ const IntegrationsPanel: React.FC = () => {
         )}
       </div>
     );
-  if (subPage === 'readest-cloud')
+  if (visibleSubPage === 'readest-cloud')
     return (
       <div className='my-4 w-full'>
         <SubPageHeader
@@ -455,31 +489,31 @@ const IntegrationsPanel: React.FC = () => {
         </BoxedList>
       </div>
     );
-  if (subPage === 'readwise')
+  if (visibleSubPage === 'readwise')
     return (
       <div className='my-4 w-full'>
         <ReadwiseForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'hardcover')
+  if (visibleSubPage === 'hardcover')
     return (
       <div className='my-4 w-full'>
         <HardcoverForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'pagebound')
+  if (visibleSubPage === 'pagebound')
     return (
       <div className='my-4 w-full'>
         <PageboundForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'notion')
+  if (visibleSubPage === 'notion')
     return (
       <div className='my-4 w-full'>
         <NotionForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'opds')
+  if (visibleSubPage === 'opds')
     return (
       <div className='my-4 w-full'>
         <SubPageHeader
@@ -491,13 +525,13 @@ const IntegrationsPanel: React.FC = () => {
         <CatalogManager inSubPage />
       </div>
     );
-  if (subPage === 'audiobookshelf')
+  if (visibleSubPage === 'audiobookshelf')
     return (
       <div className='my-4 w-full'>
         <ABSForm onBack={() => setSubPage(null)} />
       </div>
     );
-  if (subPage === 'send')
+  if (visibleSubPage === 'send')
     return (
       <div className='my-4 w-full'>
         <SendToReadestForm onBack={() => setSubPage(null)} />
@@ -660,18 +694,22 @@ const IntegrationsPanel: React.FC = () => {
         <SectionTitle className='mb-2'>{_('Reading Sync')}</SectionTitle>
         <div className='card eink-bordered border-base-200 bg-base-100 overflow-hidden border'>
           <div className='divide-base-200 divide-y'>
-            <IntegrationRow
-              icon={RiBookOpenLine}
-              title={_('KOReader')}
-              status={koSyncStatus}
-              onClick={() => setSubPage('kosync')}
-            />
-            <IntegrationRow
-              icon={RiPlanetLine}
-              title={_('BookOrbit')}
-              status={bookOrbitStatus}
-              onClick={() => setSubPage('bookorbit')}
-            />
+            {UI_FEATURES.kosync && (
+              <IntegrationRow
+                icon={RiBookOpenLine}
+                title={_('KOReader')}
+                status={koSyncStatus}
+                onClick={() => setSubPage('kosync')}
+              />
+            )}
+            {UI_FEATURES.kosync && (
+              <IntegrationRow
+                icon={RiPlanetLine}
+                title={_('BookOrbit')}
+                status={bookOrbitStatus}
+                onClick={() => setSubPage('bookorbit')}
+              />
+            )}
             <IntegrationRow
               icon={RiBookReadLine}
               title={_('Readwise')}
@@ -703,167 +741,179 @@ const IntegrationsPanel: React.FC = () => {
         </div>
       </div>
 
-      <div className='w-full' data-setting-id='settings.integrations.cloudSync'>
-        <SectionTitle className='mb-2'>{_('Cloud Sync')}</SectionTitle>
-        <div className='card eink-bordered border-base-200 bg-base-100 overflow-hidden border'>
-          <div
-            className='divide-base-200 divide-y'
-            role='group'
-            aria-label={_('Cloud sync providers')}
-          >
-            <CloudProviderRow
-              icon={RiCloudFill}
-              title={_('Readest Cloud')}
-              status={readestStatus}
-              checked={!!user && readestEnabled}
-              canToggle={!!user}
-              onToggle={(next) => toggleCloudProvider('readest', next)}
-              onOpen={() => (user ? setSubPage('readest-cloud') : navigateToLogin(router))}
-              toggleLabel={_('Sync with Readest Cloud')}
-            />
-            {/* Third-party providers are premium: every row carries the tier
+      {UI_FEATURES.auth && (
+        <div className='w-full' data-setting-id='settings.integrations.cloudSync'>
+          <SectionTitle className='mb-2'>{_('Cloud Sync')}</SectionTitle>
+          <div className='card eink-bordered border-base-200 bg-base-100 overflow-hidden border'>
+            <div
+              className='divide-base-200 divide-y'
+              role='group'
+              aria-label={_('Cloud sync providers')}
+            >
+              <CloudProviderRow
+                icon={RiCloudFill}
+                title={_('Readest Cloud')}
+                status={readestStatus}
+                checked={!!user && readestEnabled}
+                canToggle={!!user}
+                onToggle={(next) => toggleCloudProvider('readest', next)}
+                onOpen={() => (user ? setSubPage('readest-cloud') : navigateToLogin(router))}
+                toggleLabel={_('Sync with Readest Cloud')}
+              />
+              {/* Third-party providers are premium: every row carries the tier
                 badge; on a free plan the checkbox is disabled and opening a
                 row routes to the upgrade page instead of the config sub-page. */}
-            {(appService?.isDesktopApp ||
-              appService?.isAndroidApp ||
-              appService?.isIOSApp ||
-              // Web: only when a Web-type GIS client id is configured for this build.
-              (isWebAppPlatform() && !!getGoogleWebClientId())) && (
+              {(appService?.isDesktopApp ||
+                appService?.isAndroidApp ||
+                appService?.isIOSApp ||
+                // Web: only when a Web-type GIS client id is configured for this build.
+                (isWebAppPlatform() && !!getGoogleWebClientId())) && (
+                <CloudProviderRow
+                  icon={RiGoogleLine}
+                  title={_('Google Drive')}
+                  status={gdriveStatus}
+                  badge={premiumBadge}
+                  checked={!!settings.googleDrive?.enabled}
+                  canToggle={canToggleCloudProvider({
+                    isPremium: isCloudSyncPremium,
+                    isConfigured: gdriveConfigured,
+                    isEnabled: !!settings.googleDrive?.enabled,
+                  })}
+                  onToggle={(next) => toggleCloudProvider('gdrive', next)}
+                  onOpen={() =>
+                    isCloudSyncPremium ? setSubPage('gdrive') : navigateToProfile(router)
+                  }
+                  toggleLabel={_('Sync with Google Drive')}
+                />
+              )}
               <CloudProviderRow
-                icon={RiGoogleLine}
-                title={_('Google Drive')}
-                status={gdriveStatus}
+                icon={RiCloudLine}
+                title={_('WebDAV')}
+                status={webdavStatus}
                 badge={premiumBadge}
-                checked={!!settings.googleDrive?.enabled}
+                checked={!!settings.webdav?.enabled}
                 canToggle={canToggleCloudProvider({
                   isPremium: isCloudSyncPremium,
-                  isConfigured: gdriveConfigured,
-                  isEnabled: !!settings.googleDrive?.enabled,
+                  isConfigured: webdavConfigured,
+                  isEnabled: !!settings.webdav?.enabled,
                 })}
-                onToggle={(next) => toggleCloudProvider('gdrive', next)}
+                onToggle={(next) => toggleCloudProvider('webdav', next)}
                 onOpen={() =>
-                  isCloudSyncPremium ? setSubPage('gdrive') : navigateToProfile(router)
+                  isCloudSyncPremium ? setSubPage('webdav') : navigateToProfile(router)
                 }
-                toggleLabel={_('Sync with Google Drive')}
+                toggleLabel={_('Sync with WebDAV')}
               />
-            )}
-            <CloudProviderRow
-              icon={RiCloudLine}
-              title={_('WebDAV')}
-              status={webdavStatus}
-              badge={premiumBadge}
-              checked={!!settings.webdav?.enabled}
-              canToggle={canToggleCloudProvider({
-                isPremium: isCloudSyncPremium,
-                isConfigured: webdavConfigured,
-                isEnabled: !!settings.webdav?.enabled,
-              })}
-              onToggle={(next) => toggleCloudProvider('webdav', next)}
-              onOpen={() => (isCloudSyncPremium ? setSubPage('webdav') : navigateToProfile(router))}
-              toggleLabel={_('Sync with WebDAV')}
-            />
-            <CloudProviderRow
-              icon={RiDatabase2Line}
-              title={_('S3 Storage')}
-              status={s3Status}
-              badge={premiumBadge}
-              checked={!!settings.s3?.enabled}
-              canToggle={canToggleCloudProvider({
-                isPremium: isCloudSyncPremium,
-                isConfigured: s3Configured,
-                isEnabled: !!settings.s3?.enabled,
-              })}
-              onToggle={(next) => toggleCloudProvider('s3', next)}
-              onOpen={() => (isCloudSyncPremium ? setSubPage('s3') : navigateToProfile(router))}
-              toggleLabel={_('Sync with S3')}
-            />
-            {(appService?.isDesktopApp ||
-              appService?.isAndroidApp ||
-              appService?.isIOSApp ||
-              // Web: only when a Web-type Microsoft client id is configured for this build.
-              (isWebAppPlatform() && !!getMicrosoftClientId())) && (
               <CloudProviderRow
-                icon={RiMicrosoftLine}
-                title={_('OneDrive')}
-                status={onedriveStatus}
+                icon={RiDatabase2Line}
+                title={_('S3 Storage')}
+                status={s3Status}
                 badge={premiumBadge}
-                checked={!!settings.onedrive?.enabled}
+                checked={!!settings.s3?.enabled}
                 canToggle={canToggleCloudProvider({
                   isPremium: isCloudSyncPremium,
-                  isConfigured: onedriveConfigured,
-                  isEnabled: !!settings.onedrive?.enabled,
+                  isConfigured: s3Configured,
+                  isEnabled: !!settings.s3?.enabled,
                 })}
-                onToggle={(next) => toggleCloudProvider('onedrive', next)}
-                onOpen={() =>
-                  isCloudSyncPremium ? setSubPage('onedrive') : navigateToProfile(router)
-                }
-                toggleLabel={_('Sync with OneDrive')}
+                onToggle={(next) => toggleCloudProvider('s3', next)}
+                onOpen={() => (isCloudSyncPremium ? setSubPage('s3') : navigateToProfile(router))}
+                toggleLabel={_('Sync with S3')}
               />
-            )}
-            {(appService?.isIOSApp || appService?.isMacOSApp) && (
-              <CloudProviderRow
-                icon={RiAppleLine}
-                title={_('iCloud')}
-                status={icloudStatus}
-                badge={premiumBadge}
-                checked={!!settings.icloud?.enabled}
-                canToggle={canToggleCloudProvider({
-                  isPremium: isCloudSyncPremium,
-                  isConfigured: icloudAvailable,
-                  isEnabled: !!settings.icloud?.enabled,
-                })}
-                onToggle={(next) => toggleCloudProvider('icloud', next)}
-                onOpen={() =>
-                  isCloudSyncPremium ? setSubPage('icloud') : navigateToProfile(router)
-                }
-                toggleLabel={_('Sync with iCloud')}
-              />
-            )}
+              {(appService?.isDesktopApp ||
+                appService?.isAndroidApp ||
+                appService?.isIOSApp ||
+                // Web: only when a Web-type Microsoft client id is configured for this build.
+                (isWebAppPlatform() && !!getMicrosoftClientId())) && (
+                <CloudProviderRow
+                  icon={RiMicrosoftLine}
+                  title={_('OneDrive')}
+                  status={onedriveStatus}
+                  badge={premiumBadge}
+                  checked={!!settings.onedrive?.enabled}
+                  canToggle={canToggleCloudProvider({
+                    isPremium: isCloudSyncPremium,
+                    isConfigured: onedriveConfigured,
+                    isEnabled: !!settings.onedrive?.enabled,
+                  })}
+                  onToggle={(next) => toggleCloudProvider('onedrive', next)}
+                  onOpen={() =>
+                    isCloudSyncPremium ? setSubPage('onedrive') : navigateToProfile(router)
+                  }
+                  toggleLabel={_('Sync with OneDrive')}
+                />
+              )}
+              {(appService?.isIOSApp || appService?.isMacOSApp) && (
+                <CloudProviderRow
+                  icon={RiAppleLine}
+                  title={_('iCloud')}
+                  status={icloudStatus}
+                  badge={premiumBadge}
+                  checked={!!settings.icloud?.enabled}
+                  canToggle={canToggleCloudProvider({
+                    isPremium: isCloudSyncPremium,
+                    isConfigured: icloudAvailable,
+                    isEnabled: !!settings.icloud?.enabled,
+                  })}
+                  onToggle={(next) => toggleCloudProvider('icloud', next)}
+                  onOpen={() =>
+                    isCloudSyncPremium ? setSubPage('icloud') : navigateToProfile(router)
+                  }
+                  toggleLabel={_('Sync with iCloud')}
+                />
+              )}
+            </div>
           </div>
+          {providers.length === 0 && (
+            <div className='mt-5'>
+              <Tips>
+                <li>
+                  {_(
+                    'Library sync is off. Your books, progress, and annotations stay on this device.',
+                  )}
+                </li>
+                <li>
+                  {_(
+                    'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
+                  )}
+                </li>
+              </Tips>
+            </div>
+          )}
         </div>
-        {providers.length === 0 && (
-          <div className='mt-5'>
-            <Tips>
-              <li>
-                {_(
-                  'Library sync is off. Your books, progress, and annotations stay on this device.',
-                )}
-              </li>
-              <li>
-                {_(
-                  'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
-                )}
-              </li>
-            </Tips>
-          </div>
-        )}
-      </div>
+      )}
 
-      <div className='w-full' data-setting-id='settings.integrations.catalogs'>
-        <SectionTitle className='mb-2'>{_('Content Sources')}</SectionTitle>
-        <div className='card eink-bordered border-base-200 bg-base-100 overflow-hidden border'>
-          <div className='divide-base-200 divide-y'>
-            <IntegrationRow
-              icon={RiRssLine}
-              title={_('OPDS Catalogs')}
-              status={opdsStatus}
-              onClick={() => setSubPage('opds')}
-            />
-            <IntegrationRow
-              icon={RiHeadphoneLine}
-              title={_('Audiobookshelf')}
-              status={absStatus}
-              onClick={() => setSubPage('audiobookshelf')}
-            />
-            <IntegrationRow
-              icon={RiSendPlaneLine}
-              title={_('Send to Readest')}
-              status={_('Email books to your library')}
-              onClick={() => setSubPage('send')}
-            />
+      {(UI_FEATURES.opds || UI_FEATURES.auth) && (
+        <div className='w-full' data-setting-id='settings.integrations.catalogs'>
+          <SectionTitle className='mb-2'>{_('Content Sources')}</SectionTitle>
+          <div className='card eink-bordered border-base-200 bg-base-100 overflow-hidden border'>
+            <div className='divide-base-200 divide-y'>
+              {UI_FEATURES.opds && (
+                <IntegrationRow
+                  icon={RiRssLine}
+                  title={_('OPDS Catalogs')}
+                  status={opdsStatus}
+                  onClick={() => setSubPage('opds')}
+                />
+              )}
+              {UI_FEATURES.opds && (
+                <IntegrationRow
+                  icon={RiHeadphoneLine}
+                  title={_('Audiobookshelf')}
+                  status={absStatus}
+                  onClick={() => setSubPage('audiobookshelf')}
+                />
+              )}
+              {UI_FEATURES.auth && (
+                <IntegrationRow
+                  icon={RiSendPlaneLine}
+                  title={_('Send to Readest')}
+                  status={_('Email books to your library')}
+                  onClick={() => setSubPage('send')}
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {appService?.isDesktopApp && (
         <div className='w-full' data-setting-id='settings.integrations.discord'>

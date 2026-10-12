@@ -1,3 +1,17 @@
+vi.mock('@/services/featureFlags', () => ({
+  UI_FEATURES: {
+    translation: true,
+    auth: true,
+    telemetry: true,
+    metadataAutoRetrieve: true,
+    kosync: true,
+    updater: true,
+    opds: true,
+    dictionary: true,
+    wikipedia: true,
+  },
+}));
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { SystemSettings } from '@/types/settings';
@@ -94,10 +108,10 @@ describe('Behavior update settings reset', () => {
 
     await act(async () => registerReset.mock.calls[0]![0]());
 
-    expect.soft(autoCheckSwitch().checked).toBe(true);
+    expect.soft(autoCheckSwitch().checked).toBe(false);
     expect.soft(nightlySwitch().checked).toBe(false);
     expect.soft(savedSettings()).toMatchObject({
-      autoCheckUpdates: true,
+      autoCheckUpdates: false,
       updateChannel: 'stable',
       telemetryEnabled: false,
       gamepadEnabled: false,
@@ -106,7 +120,7 @@ describe('Behavior update settings reset', () => {
     panel.unmount();
     useSettingsStore.setState({ settings: savedSettings() });
     render(<ControlPanel bookKey='' onRegisterReset={() => {}} />);
-    expect(autoCheckSwitch().checked).toBe(true);
+    expect(autoCheckSwitch().checked).toBe(false);
     expect(nightlySwitch().checked).toBe(false);
   });
 
@@ -129,9 +143,9 @@ describe('Behavior update settings reset', () => {
     await act(async () => registerReset.mock.calls[0]![0]());
     await act(async () => registerReset.mock.calls[0]![0]());
 
-    expect(autoCheckSwitch().checked).toBe(true);
+    expect(autoCheckSwitch().checked).toBe(false);
     expect(nightlySwitch().checked).toBe(false);
-    expect(savedSettings()).toMatchObject({ autoCheckUpdates: true, updateChannel: 'stable' });
+    expect(savedSettings()).toMatchObject({ autoCheckUpdates: false, updateChannel: 'stable' });
   });
 
   it('leaves update preferences alone when the app has no updater', async () => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useABSServerStore } from '@/store/absServerStore';
 import { backfillAbsCovers, syncAllAbsServers } from '@/services/audiobookshelf/librarySync';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { eventDispatcher } from '@/utils/event';
 
 const AUTO_CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -24,6 +25,7 @@ export function useABSSync() {
   }, [envConfig]);
 
   const checkABSServers = useCallback(async () => {
+    if (!UI_FEATURES.opds) return;
     if (!appService) return;
     if (isSyncingRef.current) return;
     // On a fresh boot nothing has hydrated useABSServerStore yet (no

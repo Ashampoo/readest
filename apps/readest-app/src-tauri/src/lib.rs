@@ -259,6 +259,39 @@ fn get_environment_variable(name: &str) -> String {
     std::env::var(String::from(name)).unwrap_or(String::from(""))
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+async fn open_reader_window(app: AppHandle, label: String, url: String) -> Result<(), String> {
+    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+        .inner_size(980.0, 700.0)
+        .min_inner_size(980.0, 700.0)
+        .center()
+        .resizable(true);
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .decorations(true)
+            .title_bar_style(TitleBarStyle::Overlay)
+            .title("Ashampoo E-Book Reader");
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        builder = builder
+            .decorations(false)
+            .transparent(false)
+            .shadow(undecorated_shadow_is_symmetric())
+            .title("Ashampoo E-Book Reader");
+        #[cfg(target_os = "windows")]
+        {
+            builder = builder.scroll_bar_style(ScrollBarStyle::FluentOverlay);
+        }
+    }
+
+    builder.build().map(|_| ()).map_err(|err| err.to_string())
+}
+
 #[tauri::command]
 fn get_executable_dir() -> String {
     std::env::current_exe()
@@ -642,6 +675,8 @@ pub fn run() {
             download_file,
             upload_file,
             get_environment_variable,
+            #[cfg(desktop)]
+            open_reader_window,
             get_executable_dir,
             set_webview_info,
             get_webview_version,
@@ -959,7 +994,10 @@ pub fn run() {
                     (size.width, size.height)
                 });
                 let (width, height) = default_window_size(work_area);
-                win_builder.inner_size(width, height).resizable(true)
+                win_builder
+                    .inner_size(width, height)
+                    .min_inner_size(520.0, 400.0)
+                    .resizable(true)
             };
 
             // The overlay title bar draws its title over the app's own header,
@@ -969,7 +1007,7 @@ pub fn run() {
             let win_builder = win_builder
                 .decorations(true)
                 .title_bar_style(TitleBarStyle::Overlay)
-                .title("Readest");
+                .title("Ashampoo E-Book Reader");
 
             #[cfg(all(not(target_os = "macos"), desktop))]
             let win_builder = {
@@ -977,7 +1015,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(undecorated_shadow_is_symmetric())
-                    .title("Readest");
+                    .title("Ashampoo E-Book Reader");
 
                 #[cfg(target_os = "windows")]
                 {

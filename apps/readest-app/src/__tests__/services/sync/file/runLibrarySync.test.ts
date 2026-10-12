@@ -1,3 +1,17 @@
+vi.mock('@/services/featureFlags', () => ({
+  UI_FEATURES: {
+    translation: true,
+    auth: true,
+    telemetry: true,
+    metadataAutoRetrieve: true,
+    kosync: true,
+    updater: true,
+    opds: true,
+    dictionary: true,
+    wikipedia: true,
+  },
+}));
+
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { useSettingsStore } from '@/store/settingsStore';
 import { setCachedUserPlan } from '@/services/sync/cloudSyncProvider';

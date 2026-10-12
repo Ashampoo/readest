@@ -1,8 +1,10 @@
 import { redirect, useRouter } from 'next/navigation';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, ScrollBarStyle } from '@tauri-apps/api/window';
 import { getAllWebviewWindows, WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { isPWA, isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
 import { BOOK_IDS_SEPARATOR } from '@/services/constants';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { AppService } from '@/types/system';
 import { windowNeedsClientOutline } from '@/utils/window';
 
@@ -28,13 +30,23 @@ const createReaderWindow = async (appService: AppService, url: string) => {
   const label = currentWindow.label;
   const newLabelPrefix = label === 'main' ? 'reader' : label;
   const newLabel = await reserveWindowLabel(newLabelPrefix);
+  if (appService.hasWindow && url.startsWith('/reader')) {
+    try {
+      await invoke('open_reader_window', { label: newLabel, url });
+    } catch (error) {
+      console.error('error creating reader window', error);
+    } finally {
+      pendingLabels.delete(newLabel);
+    }
+    return;
+  }
   const win = new WebviewWindow(newLabel, {
     url,
     width: 800,
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest',
+    title: 'Ashampoo E-Book Reader',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.
@@ -93,7 +105,7 @@ export const ensureMainLibraryWindow = async (appService: AppService) => {
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest',
+    title: 'Ashampoo E-Book Reader',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.
@@ -126,6 +138,7 @@ export const navigateToReader = (
 };
 
 export const navigateToLogin = (router: ReturnType<typeof useRouter>) => {
+  if (!UI_FEATURES.auth) return;
   const pathname = window.location.pathname;
   const search = window.location.search;
   const currentPath = pathname !== '/auth' ? pathname + search : '/';
@@ -141,6 +154,7 @@ export const navigateToHardcoverConnect = (router: ReturnType<typeof useRouter>)
 // being read when Plans was opened from the reader settings (#6607). The
 // direction picks the slide of the route view transition (useAppRouter).
 export const navigateToProfile = (router: ReturnType<typeof useRouter>) => {
+  if (!UI_FEATURES.auth) return;
   const { pathname, search } = window.location;
   document.documentElement.setAttribute('data-nav-direction', 'forward');
   router.push(`/user?redirect=${encodeURIComponent(pathname + search)}`);

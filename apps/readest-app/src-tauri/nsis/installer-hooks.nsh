@@ -59,7 +59,7 @@
 
     ; Register CLSID with full DLL path
     WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}" "" "Readest Thumbnail Provider"
-    WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}\InprocServer32" "" "$INSTDIR\readest_thumbnail.dll"
+    WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}\InprocServer32" "" "$INSTDIR\ashampoo_ebook_thumbnail.dll"
     WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}\InprocServer32" "ThreadingModel" "Apartment"
 
     ; CRITICAL: Disable process isolation - required because we use IInitializeWithItem, not IInitializeWithStream
@@ -110,7 +110,7 @@
     !insertmacro UNREGISTER_EXT ".pdf"
 
     ; Delete the DLL file
-    Delete "$INSTDIR\readest_thumbnail.dll"
+    Delete "$INSTDIR\ashampoo_ebook_thumbnail.dll"
 
     ; Refresh shell
     System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'

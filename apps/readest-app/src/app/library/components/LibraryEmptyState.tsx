@@ -6,6 +6,7 @@ import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAppRouter } from '@/hooks/useAppRouter';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { navigateToLogin } from '@/utils/nav';
 import LibraryImportButton from './LibraryImportButton';
 
@@ -36,7 +37,7 @@ const LibraryEmptyState: React.FC<LibraryEmptyStateProps> = ({ onImport }) => {
           <LibraryImportButton onImport={onImport} primary />
           {/* TODO: add a 'Browse free catalogs' secondary action that opens the
               OPDS dialog (handleShowOPDSDialog) once we settle on placement. */}
-          {!user && (
+          {UI_FEATURES.auth && !user && (
             <button
               type='button'
               className={clsx(

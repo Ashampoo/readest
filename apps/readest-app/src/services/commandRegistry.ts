@@ -8,6 +8,7 @@ import { PiRobot, PiSpeakerHigh, PiSun, PiMoon } from 'react-icons/pi';
 import { TbSunMoon } from 'react-icons/tb';
 import { MdRefresh } from 'react-icons/md';
 import { IconType } from 'react-icons';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { stubTranslation as _ } from '@/utils/misc';
 
 export type CommandCategory = 'settings' | 'actions' | 'navigation';
@@ -739,7 +740,7 @@ const actionItems = [
   },
   {
     id: 'action.about',
-    labelKey: _('About Readest'),
+    labelKey: _('About Ashampoo E-Book Reader'),
     keywords: ['about', 'readest', 'version', 'info'],
   },
   {
@@ -808,7 +809,11 @@ export const buildCommandRegistry = (options: CommandRegistryOptions): CommandIt
 
   // add language panel items
   for (const def of languagePanelItems) {
-    items.push(createSettingsItem(def, 'Language'));
+    const item = createSettingsItem(def, 'Language');
+    if (def.section === 'Translation') {
+      item.isAvailable = () => UI_FEATURES.translation;
+    }
+    items.push(item);
   }
 
   // add ai panel items (only in dev, as of now atleast)
@@ -907,6 +912,7 @@ export const buildCommandRegistry = (options: CommandRegistryOptions): CommandIt
     createActionItem({
       id: 'action.telemetry',
       action: options.toggleTelemetry,
+      isAvailable: () => UI_FEATURES.telemetry,
     }),
   );
 

@@ -1,3 +1,17 @@
+vi.mock('@/services/featureFlags', () => ({
+  UI_FEATURES: {
+    translation: true,
+    auth: true,
+    telemetry: true,
+    metadataAutoRetrieve: true,
+    kosync: true,
+    updater: true,
+    opds: true,
+    dictionary: true,
+    wikipedia: true,
+  },
+}));
+
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

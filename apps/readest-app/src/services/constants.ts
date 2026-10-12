@@ -208,7 +208,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   alwaysOnTop: false,
   openBookInNewWindow: true,
   alwaysShowStatusBar: false,
-  autoCheckUpdates: true,
+  autoCheckUpdates: false,
   updateChannel: 'stable',
   screenWakeLock: false,
   autohideCursor: true,
@@ -231,7 +231,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   openLastBooks: false,
   lastOpenBooks: [],
   autoImportBooksOnOpen: false,
-  telemetryEnabled: true,
+  telemetryEnabled: false,
   discordRichPresenceEnabled: false,
   libraryViewMode: 'grid',
   librarySortBy: LibrarySortByType.Updated,
@@ -540,6 +540,8 @@ export const DEFAULT_TRANSLATOR_CONFIG: TranslatorConfig = {
   translationFontSize: 1,
   translationColor: '',
 };
+
+export { UI_FEATURES } from './featureFlags';
 
 export const DEFAULT_NOTE_EXPORT_CONFIG: NoteExportConfig = {
   includeTitle: true,

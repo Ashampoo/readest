@@ -12,6 +12,7 @@ import {
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/utils/supabase';
 import posthog from 'posthog-js';
+import { UI_FEATURES } from '@/services/featureFlags';
 
 interface AuthContextType {
   token: string | null;
@@ -25,12 +26,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(() => {
+    if (!UI_FEATURES.auth) return null;
     if (typeof window !== 'undefined') {
       return localStorage.getItem('token');
     }
     return null;
   });
   const [user, setUser] = useState<User | null>(() => {
+    if (!UI_FEATURES.auth) return null;
     if (typeof window !== 'undefined') {
       const userJson = localStorage.getItem('user');
       return userJson ? JSON.parse(userJson) : null;
@@ -39,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   useEffect(() => {
+    if (!UI_FEATURES.auth) return;
     const syncSession = (
       session: { access_token: string; refresh_token: string; user: User } | null,
     ) => {
@@ -48,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('token', access_token);
         localStorage.setItem('refresh_token', refresh_token);
         localStorage.setItem('user', JSON.stringify(user));
-        posthog.identify(user.id);
+        if (UI_FEATURES.telemetry) posthog.identify(user.id);
         setToken(access_token);
         setUser(user);
       } else {
@@ -83,6 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // context value — without this, login/logout/refresh would be recreated on
   // every render and the memo would always invalidate.
   const login = useCallback((newToken: string, newUser: User) => {
+    if (!UI_FEATURES.auth) return;
     console.log('Logging in');
     setToken(newToken);
     setUser(newUser);

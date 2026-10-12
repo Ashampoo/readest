@@ -31,6 +31,7 @@ import {
 } from '@/utils/telemetry';
 import { getLibraryViewSettings } from '@/helpers/settings';
 import { SETTINGS_FILENAME } from '@/services/constants';
+import { UI_FEATURES } from '@/services/featureFlags';
 import type { AppService } from '@/types/system';
 import type { SystemSettings } from '@/types/settings';
 import { DropdownProvider } from '@/context/DropdownContext';
@@ -67,6 +68,14 @@ const finalizeTelemetryDecision = ({
   isNewUser: boolean;
   onShowPrompt: () => void;
 }) => {
+  if (!UI_FEATURES.telemetry) {
+    if (settings.telemetryEnabled) {
+      settings.telemetryEnabled = false;
+      void appService.saveSettings(settings);
+    }
+    optOutTelemetry();
+    return;
+  }
   const existing = getTelemetryDecision();
   if (existing === 'pending') {
     onShowPrompt();
@@ -217,7 +226,9 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
         // local defaults to the server with a fresh HLC — overwriting
         // the cross-device authoritative values another device set.
         // Idempotent — safe to call on remount.
-        initSettingsSync(settings);
+        if (UI_FEATURES.auth) {
+          initSettingsSync(settings);
+        }
       });
     }
   }, [

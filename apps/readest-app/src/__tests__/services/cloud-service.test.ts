@@ -140,13 +140,14 @@ describe('cloudService', () => {
         expect(mockFs.removeDir).not.toHaveBeenCalled();
       });
 
-      test('only deletes book file, not cover (local action)', async () => {
+      test('deletes the book file and its cover (local action)', async () => {
         const book = createMockBook();
         await deleteBook(mockFs, book, 'local');
 
-        // local action only deletes the book file
-        expect(mockFs.removeFile).toHaveBeenCalledTimes(1);
+        expect(mockFs.removeFile).toHaveBeenCalledTimes(2);
         expect(mockFs.removeFile).toHaveBeenCalledWith(`${book.hash}/${book.title}.epub`, 'Books');
+        expect(mockFs.removeFile).toHaveBeenCalledWith(`${book.hash}/cover.png`, 'Books');
+        expect(book.coverDownloadedAt).toBeNull();
       });
 
       test('removes the managed copy when filePath is stale', async () => {
@@ -351,9 +352,9 @@ describe('cloudService', () => {
         mockInPlaceExists(book);
         await deleteBook(mockFs, book, 'local');
 
-        // There is no managed Books/<hash>/<title>.epub copy for an in-place
-        // book, and the external source is off-limits, so nothing is removed.
-        expect(mockFs.removeFile).not.toHaveBeenCalled();
+        // The external source stays. The app-owned cover beside the book is removed.
+        expect(mockFs.removeFile).not.toHaveBeenCalledWith(book.filePath, 'None');
+        expect(mockFs.removeFile).toHaveBeenCalledWith(`${book.hash}/cover.png`, 'Books');
       });
 
       test('local action still clears downloadedAt', async () => {

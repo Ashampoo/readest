@@ -70,8 +70,12 @@ export async function deleteBook(
     }
     book.absDownloadedAt = null;
 
-    if (deleteAction === 'both' && (await fs.exists(getCoverFilename(book), 'Books'))) {
+    if (
+      (deleteAction === 'local' || deleteAction === 'both') &&
+      (await fs.exists(getCoverFilename(book), 'Books'))
+    ) {
       await fs.removeFile(getCoverFilename(book), 'Books');
+      book.coverDownloadedAt = null;
     }
     if (deleteAction === 'local' || deleteAction === 'purge') {
       // Mirror 'local': mark not-downloaded but leave the tombstone (deletedAt)

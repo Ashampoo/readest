@@ -10,6 +10,7 @@ import { Book, BookProgress, FIXED_LAYOUT_FORMATS } from '@/types/book';
 import type { KOSyncSettings, SystemSettings } from '@/types/settings';
 import { BookDoc } from '@/libs/document';
 import { debounce } from '@/utils/debounce';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { eventDispatcher } from '@/utils/event';
 import { getCFIFromXPointer, getXPointerFromCFI } from '@/utils/xcfi';
 import { isMalformedLocationCfi } from '@/utils/cfi';
@@ -100,6 +101,10 @@ export const useKOSync = (bookKey: string, provider: KosyncProgressProvider = ko
   const progress = useBookProgress(bookKey);
 
   useEffect(() => {
+    if (!UI_FEATURES.kosync) {
+      setKOSyncClient(null);
+      return;
+    }
     const config = provider.selectConfig(settings);
     if (!config) {
       setKOSyncClient(null);

@@ -7,6 +7,7 @@ import { RsvpState, RSVPController } from '@/services/rsvp';
 import { containsCJK, isRTLText } from '@/services/rsvp/utils';
 import { useThemeStore } from '@/store/themeStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { TOCItem } from '@/libs/document';
 import {
   IoClose,
@@ -612,6 +613,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
 
   // Detect a selection inside the context panel and surface a "Look up" pill.
   const handleContextSelection = useCallback(() => {
+    if (!UI_FEATURES.dictionary && !UI_FEATURES.wikipedia) return;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
       setLookup(null);
@@ -1399,7 +1401,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
       </div>
 
       {/* Dictionary lookup from a context selection (#4475) */}
-      {lookup && (
+      {(UI_FEATURES.dictionary || UI_FEATURES.wikipedia) && lookup && (
         <button
           aria-label={_('Look up')}
           className='eink-bordered fixed z-[101] flex -translate-x-1/2 -translate-y-full items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold shadow-lg'
@@ -1415,7 +1417,8 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
           {_('Look up')}
         </button>
       )}
-      {dict &&
+      {(UI_FEATURES.dictionary || UI_FEATURES.wikipedia) &&
+        dict &&
         // Below `sm` (or short landscape) present a bottom sheet; otherwise an
         // anchored popup — mirroring the reader's selection dictionary.
         (window.innerWidth < 640 || window.innerHeight < 640 ? (

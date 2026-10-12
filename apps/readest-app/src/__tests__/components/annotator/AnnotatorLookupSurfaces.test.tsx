@@ -1,3 +1,17 @@
+vi.mock('@/services/featureFlags', () => ({
+  UI_FEATURES: {
+    translation: true,
+    auth: true,
+    telemetry: true,
+    metadataAutoRetrieve: true,
+    kosync: true,
+    updater: true,
+    opds: true,
+    dictionary: true,
+    wikipedia: true,
+  },
+}));
+
 /**
  * When a lookup surface (dictionary / translator / proofread) may open, and when
  * it must stay shut.

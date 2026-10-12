@@ -32,6 +32,9 @@
       "allow": [
         {
           "path": "$APPDATA/Readest/**/*"
+        },
+        {
+          "path": "$APPDATA/Ashampoo/Ashampoo E-Book Reader/**/*"
         }
       ],
       "deny": []
@@ -60,6 +63,12 @@
         },
         {
           "path": "**/Readest/**/*"
+        },
+        {
+          "path": "**/Ashampoo/Ashampoo E-Book Reader"
+        },
+        {
+          "path": "**/Ashampoo/Ashampoo E-Book Reader/**/*"
         },
         {
           "path": "**/com.github.johnfactotum.Foliate/**/*"
@@ -217,6 +226,7 @@
     "allow-upload-file",
     "allow-get-environment-variable",
     "allow-get-executable-dir",
+    "allow-open-reader-window",
     "allow-set-webview-info",
     "allow-get-webview-version",
     "allow-is-updater-disabled",

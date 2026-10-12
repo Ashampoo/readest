@@ -609,7 +609,7 @@ export async function importBook(
         }
       }
       if (!loadedBook) {
-        throw new Error('Unsupported or corrupted book file');
+        throw new Error('Unsupported, protected, or corrupted book file');
       }
       normalizeMetadataIsbn(loadedBook.metadata);
       const metadataTitle = formatTitle(loadedBook.metadata.title);

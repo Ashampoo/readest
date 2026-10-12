@@ -6,6 +6,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { checkForAppUpdates, checkAppReleaseNotes } from '@/helpers/updater';
 import { isTauriAppPlatform } from '@/services/environment';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { parseWebViewInfo } from '@/utils/ua';
 import { getAppVersion } from '@/utils/version';
 import { writeTextToClipboard } from '@/utils/clipboard';
@@ -109,7 +110,9 @@ export const AboutWindow = () => {
   // report (#5285), so tapping the label copies it. The label itself stays
   // localized; the copied string is locale-neutral and names the app first.
   const handleCopyVersion = async () => {
-    const copied = await writeTextToClipboard(`Readest ${getAppVersion()} (${browserInfo})`);
+    const copied = await writeTextToClipboard(
+      `Ashampoo E-Book Reader ${getAppVersion()} (${browserInfo})`,
+    );
     if (!copied) return;
     eventDispatcher.dispatch('toast', {
       type: 'info',
@@ -123,7 +126,7 @@ export const AboutWindow = () => {
     <Dialog
       id='about_window'
       isOpen={isOpen}
-      title={_('About Readest')}
+      title={_('About Ashampoo E-Book Reader')}
       onClose={handleClose}
       boxClassName='sm:w-[480px]! sm:max-w-(--breakpoint-sm)! sm:h-auto'
     >
@@ -134,7 +137,7 @@ export const AboutWindow = () => {
               <Image src='/icon.png' alt='App Logo' className='h-20 w-20' width={64} height={64} />
             </div>
             <div className='flex select-text flex-col items-center'>
-              <h2 className='mb-2 text-2xl font-bold'>Readest</h2>
+              <h2 className='mb-2 text-2xl font-bold'>Ashampoo E-Book Reader</h2>
               <button
                 type='button'
                 title={_('Copy')}
@@ -145,7 +148,7 @@ export const AboutWindow = () => {
               </button>
             </div>
             <div className='my-1 h-5'>
-              {!updateStatus && (
+              {UI_FEATURES.updater && !updateStatus && (
                 <button
                   className='btn btn-sm btn-primary cursor-pointer p-1 text-xs'
                   onClick={appService?.hasUpdater ? handleCheckUpdate : handleShowRecentUpdates}
@@ -174,23 +177,26 @@ export const AboutWindow = () => {
             dir='ltr'
           >
             <p className='text-neutral-content text-sm'>
-              © {new Date().getFullYear()} Bilingify LLC. All rights reserved.
+              © {new Date().getFullYear()} Ashampoo GmbH &amp; Co. KG. All rights reserved.
             </p>
 
             <p className='text-neutral-content text-xs'>
-              This software is licensed under the{' '}
+              Based on{' '}
+              <Link href='https://github.com/readest/readest' className='text-blue-500 underline'>
+                Readest
+              </Link>
+              , licensed under the{' '}
               <Link
                 href='https://www.gnu.org/licenses/agpl-3.0.html'
                 className='text-blue-500 underline'
               >
                 GNU Affero General Public License v3.0
               </Link>
-              . You are free to use, modify, and distribute this software under the terms of the
-              AGPL v3 license. Please see the license for more details.
+              .
             </p>
             <p className='text-neutral-content text-xs'>
-              Source code is available at{' '}
-              <Link href='https://github.com/readest/readest' className='text-blue-500 underline'>
+              Source code of this fork is available at{' '}
+              <Link href='https://github.com/ashampoo/readest' className='text-blue-500 underline'>
                 GitHub
               </Link>
               .

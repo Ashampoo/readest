@@ -8,6 +8,7 @@ import {
   ValidationResult,
 } from '@/utils/validation';
 import { MetadataSource } from './SourceSelector';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { searchMetadata } from '@/libs/metadata';
 import { formatAuthors, formatTitle, getPrimaryLanguage } from '@/utils/book';
 
@@ -201,6 +202,7 @@ export const useMetadataEdit = (metadata: BookMetadata | null, tags: string[]) =
   };
 
   const handleAutoRetrieve = async () => {
+    if (!UI_FEATURES.metadataAutoRetrieve) return;
     setSearchLoading(true);
     try {
       const isbnValidation = validateISBN(editedMeta.isbn || '');

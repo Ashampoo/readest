@@ -632,7 +632,7 @@ export class DocumentLoader {
     } catch (e: unknown) {
       console.error('Failed to open document:', e);
       if (e instanceof Error && e.message?.includes('not a valid zip')) {
-        throw new Error('Unsupported or corrupted book file');
+        throw new Error('Unsupported, protected, or corrupted book file');
       }
       throw e;
     }

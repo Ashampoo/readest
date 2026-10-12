@@ -32,6 +32,7 @@ import { TranslationFunc, useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useQuotaStats } from '@/hooks/useQuotaStats';
 import { isTTSCacheAllowed } from '@/utils/access';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { navigateToLogin, navigateToProfile } from '@/utils/nav';
 import { getLanguageName } from '@/utils/lang';
 import { formatPlaybackTime } from '@/utils/time';
@@ -621,32 +622,36 @@ const TTSPlayerSheet = ({
               </span>
             </button>
           </div>
-          {!isNarrating && downloads.supported && downloads.chapters.length > 0 && (
-            <button
-              type='button'
-              aria-label={_('Offline Audio')}
-              onClick={handleOpenDownloads}
-              className='not-eink:bg-base-200 eink-bordered flex w-full items-center gap-3 rounded-xl px-3 py-2.5'
-            >
-              <MdOutlineFileDownload size={iconSize24} className='shrink-0' />
-              <div className='flex min-w-0 flex-1 flex-col items-start'>
-                <span className='text-sm font-semibold'>{_('Offline Audio')}</span>
-                <span className='text-base-content/60 line-clamp-1 text-start text-xs'>
-                  {premiumBadge
-                    ? _('Download chapters for offline playback')
-                    : _('{{done}} of {{total}} downloaded', {
-                        done: downloads.chapters.filter((c) => downloads.statusOf(c) === 'complete')
-                          .length,
-                        total: downloads.chapters.length,
-                      })}
-                </span>
-              </div>
-              {premiumBadge && (
-                <span className='badge badge-sm badge-ghost shrink-0'>{premiumBadge}</span>
-              )}
-              <MdChevronRight size={iconSize24} className='shrink-0 rtl:rotate-180' />
-            </button>
-          )}
+          {UI_FEATURES.auth &&
+            !isNarrating &&
+            downloads.supported &&
+            downloads.chapters.length > 0 && (
+              <button
+                type='button'
+                aria-label={_('Offline Audio')}
+                onClick={handleOpenDownloads}
+                className='not-eink:bg-base-200 eink-bordered flex w-full items-center gap-3 rounded-xl px-3 py-2.5'
+              >
+                <MdOutlineFileDownload size={iconSize24} className='shrink-0' />
+                <div className='flex min-w-0 flex-1 flex-col items-start'>
+                  <span className='text-sm font-semibold'>{_('Offline Audio')}</span>
+                  <span className='text-base-content/60 line-clamp-1 text-start text-xs'>
+                    {premiumBadge
+                      ? _('Download chapters for offline playback')
+                      : _('{{done}} of {{total}} downloaded', {
+                          done: downloads.chapters.filter(
+                            (c) => downloads.statusOf(c) === 'complete',
+                          ).length,
+                          total: downloads.chapters.length,
+                        })}
+                  </span>
+                </div>
+                {premiumBadge && (
+                  <span className='badge badge-sm badge-ghost shrink-0'>{premiumBadge}</span>
+                )}
+                <MdChevronRight size={iconSize24} className='shrink-0 rtl:rotate-180' />
+              </button>
+            )}
         </div>
       )}
       {view === 'chapters' && (

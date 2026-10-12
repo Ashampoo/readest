@@ -21,7 +21,10 @@ const IMPORT_ERROR_MAP: [string, string][] = [
   ['Unsupported format', _('This book format is not supported')],
   ['Failed to open file', _('Failed to open the book file')],
   ['Invalid or empty book file', _('The book file is empty')],
-  ['Unsupported or corrupted book file', _('The book file is corrupted')],
+  [
+    'Unsupported, protected, or corrupted book file',
+    _('Unsupported, protected, or corrupted book file'),
+  ],
 ];
 
 export const getImportErrorMessage = (errorMsg: string): string => {

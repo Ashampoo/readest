@@ -78,6 +78,7 @@ import { lockScreenOrientation, selectDirectory, showFilePicker } from '@/utils/
 import { useAndroidPickedBooks } from '@/hooks/useAndroidFilePicker';
 import { requestStoragePermission } from '@/utils/permission';
 import { SUPPORTED_BOOK_EXTS } from '@/services/constants';
+import { UI_FEATURES } from '@/services/featureFlags';
 import {
   tauriHandleClose,
   tauriHandleSetAlwaysOnTop,
@@ -405,7 +406,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     scrollRef,
     async () => {
       if (!user) {
-        navigateToLogin(router);
+        if (UI_FEATURES.auth) navigateToLogin(router);
         return;
       }
       await pullLibrary(false, true);
@@ -413,7 +414,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     },
     async () => {
       if (!user) {
-        navigateToLogin(router);
+        if (UI_FEATURES.auth) navigateToLogin(router);
         return;
       }
       await pullLibrary(true, true);
@@ -681,6 +682,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   };
 
   const handleShowOPDSDialog = () => {
+    if (!UI_FEATURES.opds) return;
     setShowCatalogManager(true);
   };
 
@@ -2118,12 +2120,14 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       <AboutWindow />
       <KeyboardShortcutsHelp />
       <LocalSendManager />
-      <UpdaterWindow />
+      {UI_FEATURES.updater && <UpdaterWindow />}
       <MigrateDataWindow />
       <BackupWindow onPullLibrary={pullLibrary} />
       <CacheManagerWindow />
       {isSettingsDialogOpen && <SettingsDialog bookKey={''} />}
-      {showCatalogManager && <CatalogDialog onClose={handleDismissOPDSDialog} />}
+      {UI_FEATURES.opds && showCatalogManager && (
+        <CatalogDialog onClose={handleDismissOPDSDialog} />
+      )}
       {showFeeds && <FeedsView onClose={() => setShowFeeds(false)} />}
       <AddFeedModal
         isOpen={showAddFeed}

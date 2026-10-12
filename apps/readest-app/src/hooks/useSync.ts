@@ -11,6 +11,7 @@ import { transformBookNoteFromDB } from '@/utils/transform';
 import { transformBookFromDB } from '@/utils/transform';
 import { DBBook, DBBookConfig, DBBookNote } from '@/types/records';
 import { Book, BookConfig, BookDataRecord, BookNote } from '@/types/book';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { navigateToLogin } from '@/utils/nav';
 import { useReaderStore } from '@/store/readerStore';
 
@@ -175,6 +176,7 @@ export function useSync(bookKey?: string) {
     bookId?: string,
     metaHash?: string,
   ) => {
+    if (!UI_FEATURES.auth) return 0;
     setSyncing(true);
     setSyncError(null);
 
@@ -260,6 +262,7 @@ export function useSync(bookKey?: string) {
   };
 
   const pushChanges = async (payload: SyncData): Promise<boolean> => {
+    if (!UI_FEATURES.auth) return false;
     setSyncing(true);
     setSyncError(null);
 

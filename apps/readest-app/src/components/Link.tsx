@@ -12,6 +12,7 @@ const Link: React.FC<LinkProps> = ({ href, children, ...props }) => {
   const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (isTauri) {
       e.preventDefault();
+      e.stopPropagation();
       try {
         await openUrl(href);
       } catch (error) {

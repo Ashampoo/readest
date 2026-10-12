@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { parseWebViewInfo } from '@/utils/ua';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { handleGlobalError } from '@/utils/error';
 
 interface ErrorPageProps {
@@ -22,7 +23,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
   }, [appService]);
 
   useEffect(() => {
-    posthog.captureException(error);
+    if (UI_FEATURES.telemetry) posthog.captureException(error);
     handleGlobalError(error);
   }, [appService, error]);
 

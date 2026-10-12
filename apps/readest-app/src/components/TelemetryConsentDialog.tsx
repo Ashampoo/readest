@@ -6,6 +6,7 @@ import ModalPortal from '@/components/ModalPortal';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { optInTelemetry, optOutTelemetry } from '@/utils/telemetry';
 
 interface TelemetryConsentDialogProps {
@@ -22,7 +23,7 @@ export default function TelemetryConsentDialog({ open, onClose }: TelemetryConse
   const _ = useTranslation();
   const { envConfig } = useEnv();
 
-  if (!open) return null;
+  if (!UI_FEATURES.telemetry || !open) return null;
 
   // Persist `telemetryEnabled` via the settings store if it has already
   // been seeded by the library/reader page; otherwise go straight through

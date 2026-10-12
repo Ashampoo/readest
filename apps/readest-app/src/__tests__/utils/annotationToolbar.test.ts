@@ -1,4 +1,18 @@
-import { describe, test, expect } from 'vitest';
+vi.mock('@/services/featureFlags', () => ({
+  UI_FEATURES: {
+    translation: true,
+    auth: true,
+    telemetry: true,
+    metadataAutoRetrieve: true,
+    kosync: true,
+    updater: true,
+    opds: true,
+    dictionary: true,
+    wikipedia: true,
+  },
+}));
+
+import { describe, test, expect, vi } from 'vitest';
 import { annotationToolButtons } from '@/app/reader/components/annotator/AnnotationTools';
 import {
   ALL_ANNOTATION_TOOL_TYPES,

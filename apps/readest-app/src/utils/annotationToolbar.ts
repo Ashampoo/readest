@@ -1,5 +1,12 @@
 import type { AnnotationToolType } from '@/types/annotator';
 import { BookFormat, FIXED_LAYOUT_FORMATS } from '@/types/book';
+import { UI_FEATURES } from '@/services/featureFlags';
+
+const isAnnotationToolEnabled = (type: AnnotationToolType): boolean => {
+  if (type === 'dictionary') return UI_FEATURES.dictionary || UI_FEATURES.wikipedia;
+  if (type === 'translate') return UI_FEATURES.translation;
+  return true;
+};
 
 // Proofread rewrites the rendered text through the content transformers, which
 // every reflowable format runs (Markdown wires the same pipeline in utils/md.ts
@@ -59,7 +66,8 @@ const sanitize = (items: AnnotationToolType[] | undefined): AnnotationToolType[]
 export const getToolbarToolTypes = (
   items: AnnotationToolType[] | undefined,
   canShare: boolean,
-): AnnotationToolType[] => sanitize(items).filter((type) => canShare || type !== 'share');
+): AnnotationToolType[] =>
+  sanitize(items).filter((type) => isAnnotationToolEnabled(type) && (canShare || type !== 'share'));
 
 // One-tap highlighting (#5983): whenever the highlight tool is on the toolbar,
 // the style/color strip shows as soon as text is selected, so picking a color
@@ -82,7 +90,7 @@ export const getAvailableToolTypes = (
 ): AnnotationToolType[] => {
   const visible = new Set(sanitize(items));
   return ALL_ANNOTATION_TOOL_TYPES.filter(
-    (type) => !visible.has(type) && (canShare || type !== 'share'),
+    (type) => isAnnotationToolEnabled(type) && !visible.has(type) && (canShare || type !== 'share'),
   );
 };
 

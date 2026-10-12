@@ -1,4 +1,6 @@
 import { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { UI_FEATURES } from '@/services/featureFlags';
 
 export const metadata: Metadata = {
   title: 'Account & Sign In',
@@ -7,5 +9,8 @@ export const metadata: Metadata = {
 };
 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
+  if (!UI_FEATURES.auth) {
+    redirect('/library');
+  }
   return <>{children}</>;
 }

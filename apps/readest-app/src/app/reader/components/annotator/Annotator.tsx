@@ -65,6 +65,7 @@ import { getIndexFromCfi } from '@/utils/cfi';
 import { writeTextToClipboard } from '@/utils/clipboard';
 import { AnnotationLinkType, buildAnnotationUrl } from '@/utils/deeplink';
 import { DEFAULT_NOTE_EXPORT_CONFIG } from '@/services/constants';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { canShareText, shareSelectedText } from '@/utils/share';
 import {
   getToolbarToolTypes,
@@ -1182,6 +1183,10 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
           handleSearch();
           break;
         case 'dictionary':
+          if (!UI_FEATURES.dictionary && !UI_FEATURES.wikipedia) {
+            handleShowAnnotPopup();
+            break;
+          }
           // A dictionary lookup only makes sense for a single word (or a short
           // CJK term); on a longer selection fall back to the annotation
           // toolbar so highlighting and copying stay reachable (#5213).
@@ -1203,6 +1208,10 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
           }
           break;
         case 'translate':
+          if (!UI_FEATURES.translation) {
+            handleShowAnnotPopup();
+            break;
+          }
           handleTranslation();
           break;
         case 'tts':
@@ -1844,6 +1853,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   };
 
   const handleDictionary = () => {
+    if (!UI_FEATURES.dictionary && !UI_FEATURES.wikipedia) return;
     if (!selection || !selection.text) return;
     // System-dictionary path: when the user has opted in via Settings →
     // Languages → Dictionaries, hand the selection to the OS instead of
@@ -1872,6 +1882,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   };
 
   const handleTranslation = () => {
+    if (!UI_FEATURES.translation) return;
     if (!selection || !selection.text) return;
     setShowAnnotPopup(false);
     void suppressNativeSelectionHandles();
@@ -2558,8 +2569,10 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       case 'search':
         return { tooltipText: _(label), Icon, onClick: handleSearch };
       case 'dictionary':
+        if (!UI_FEATURES.dictionary && !UI_FEATURES.wikipedia) return null;
         return { tooltipText: _(label), Icon, onClick: handleDictionary };
       case 'translate':
+        if (!UI_FEATURES.translation) return null;
         return { tooltipText: _(label), Icon, onClick: handleTranslation };
       case 'tts':
         return {
@@ -2645,7 +2658,8 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   return (
     <div ref={containerRef} role='toolbar' tabIndex={-1}>
       <PageTurnHint bookKey={bookKey} contentInsets={contentInsets} hint={turnHint} />
-      {showDictionaryPopup &&
+      {(UI_FEATURES.dictionary || UI_FEATURES.wikipedia) &&
+        showDictionaryPopup &&
         (() => {
           // Below `sm` (or short landscape) we present the dictionary as a
           // bottom sheet — the anchored popup gets cramped at this size.
@@ -2686,7 +2700,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
             />
           );
         })()}
-      {showDeepLPopup && trianglePosition && translatorPopupPosition && (
+      {UI_FEATURES.translation && showDeepLPopup && trianglePosition && translatorPopupPosition && (
         <TranslatorPopup
           bookKey={bookKey}
           text={selection?.text as string}

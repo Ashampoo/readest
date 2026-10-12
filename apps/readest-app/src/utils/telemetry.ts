@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { UI_FEATURES } from '@/services/featureFlags';
 
 export const TELEMETRY_OPT_OUT_KEY = 'readest-telemetry-opt-out';
 export const TELEMETRY_DECISION_KEY = 'readest-telemetry-decision';
@@ -9,6 +10,7 @@ export type TelemetryDecision = 'opt-in' | 'opt-out' | 'pending';
 export const TELEMETRY_PROMPT_BUCKET_RATE = 0.1;
 
 export const hasOptedOutTelemetry = () => {
+  if (!UI_FEATURES.telemetry) return true;
   return localStorage.getItem(TELEMETRY_OPT_OUT_KEY) === 'true';
 };
 
@@ -29,15 +31,15 @@ export const rollIntoTelemetryPromptBucket = (rng: () => number = Math.random) =
 };
 
 export const captureEvent = (event: string, properties?: Record<string, unknown>) => {
-  if (!hasOptedOutTelemetry()) {
-    posthog.capture(event, properties);
-  }
+  if (!UI_FEATURES.telemetry || hasOptedOutTelemetry()) return;
+  posthog.capture(event, properties);
 };
 
 // Boot records the decision before PostHog starts; `applyPostHogConsent`
 // hands it to the SDK once init has set the project token. A consent call
 // before init would be stored under a token-less key that nothing reads.
 export const optInTelemetry = () => {
+  if (!UI_FEATURES.telemetry) return;
   localStorage.setItem(TELEMETRY_OPT_OUT_KEY, 'false');
   setTelemetryDecision('opt-in');
   if (posthog.__loaded) posthog.opt_in_capturing();
@@ -53,6 +55,10 @@ export const optOutTelemetry = () => {
  * boot, so an opt-in is restored without the SDK's default `$opt_in` event.
  */
 export const applyPostHogConsent = () => {
+  if (!UI_FEATURES.telemetry) {
+    if (posthog.__loaded) posthog.opt_out_capturing();
+    return;
+  }
   if (getTelemetryDecision() === 'opt-in') {
     posthog.opt_in_capturing({ captureEventName: false });
   } else {
@@ -72,6 +78,10 @@ export const applyPostHogConsent = () => {
  * the settings file off and the settings panel shows what is in effect.
  */
 export const reconcileTelemetryConsent = (telemetryEnabled: boolean) => {
+  if (!UI_FEATURES.telemetry) {
+    optOutTelemetry();
+    return false;
+  }
   if (!telemetryEnabled && !hasOptedOutTelemetry()) {
     optOutTelemetry();
   }

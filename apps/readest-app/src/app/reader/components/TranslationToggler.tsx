@@ -7,6 +7,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { saveViewSettings } from '@/helpers/settings';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { isTranslationAvailable } from '@/services/translators/utils';
 import Button from '@/components/Button';
 
@@ -41,6 +42,8 @@ const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
       isTranslationAvailable(bookData?.book, viewSettings.translateTargetLang),
     );
   }, [bookData, viewSettings.translationEnabled, viewSettings.translateTargetLang]);
+
+  if (!UI_FEATURES.translation) return null;
 
   return (
     <Button

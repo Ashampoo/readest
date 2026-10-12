@@ -11,6 +11,7 @@ import {
   MdExpandLess,
 } from 'react-icons/md';
 
+import { UI_FEATURES } from '@/services/featureFlags';
 import { Book } from '@/types/book';
 import { BookMetadata } from '@/libs/document';
 import { openExternalUrl } from '@/utils/open';
@@ -152,13 +153,13 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 <MdOutlineEdit className='hover:fill-blue-500' />
               </button>
             )}
-            {book.uploadedAt && onDownload && (
+            {UI_FEATURES.auth && book.uploadedAt && onDownload && (
               <button onClick={onDownload} title={_('Download from Cloud')}>
                 <MdOutlineCloudDownload className='fill-base-content' />
               </button>
             )}
             {/* A feed book is fileless — there is nothing to push (#5307). */}
-            {book.downloadedAt && !isFeedBook(book) && onUpload && (
+            {UI_FEATURES.auth && book.downloadedAt && !isFeedBook(book) && onUpload && (
               <button onClick={onUpload} title={_('Upload to Cloud')}>
                 <MdOutlineCloudUpload className='fill-base-content' />
               </button>
@@ -176,7 +177,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 )}
               </button>
             )}
-            {onDelete && (
+            {onDelete && UI_FEATURES.auth && (
               <Dropdown
                 label={_('Delete Book Options')}
                 className='dropdown-bottom dropdown-center flex justify-center'
@@ -216,6 +217,16 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                   />
                 </div>
               </Dropdown>
+            )}
+            {onDelete && !UI_FEATURES.auth && (
+              <button
+                onClick={onDelete}
+                title={_('Delete')}
+                aria-label={_('Delete')}
+                className='btn btn-ghost h-8 min-h-8 w-8 p-0'
+              >
+                <MdOutlineDelete className='fill-red-500' />
+              </button>
             )}
             <Dropdown
               label={_('More Actions')}

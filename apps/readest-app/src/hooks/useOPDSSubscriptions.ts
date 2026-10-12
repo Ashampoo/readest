@@ -8,6 +8,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { syncSubscribedCatalogs } from '@/services/opds';
 import { queueOPDSBookUploads } from '@/services/opds/cloudUpload';
 import { AUTO_CHECK_INTERVAL_MS } from '@/services/opds/types';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { eventDispatcher } from '@/utils/event';
 
 export function useOPDSSubscriptions() {
@@ -19,6 +20,7 @@ export function useOPDSSubscriptions() {
 
   const checkOPDSSubscriptions = useCallback(
     async (verbose = false) => {
+      if (!UI_FEATURES.opds) return;
       if (!appService || !libraryLoaded) return;
       if (isSyncingRef.current) return;
 

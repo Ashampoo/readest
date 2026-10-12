@@ -37,6 +37,7 @@ fn main() {
             "download_file",
             "upload_file",
             "get_environment_variable",
+            "open_reader_window",
             "get_executable_dir",
             "set_webview_info",
             "get_webview_version",

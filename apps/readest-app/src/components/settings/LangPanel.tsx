@@ -16,6 +16,7 @@ import {
 import { isTranslationAvailable } from '@/services/translators/utils';
 import { DEFAULT_PROMPT_ID, isCustomTranslatorName } from '@/services/translators/custom';
 import { useCustomTranslatorStore } from '@/store/customTranslatorStore';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { getLocale } from '@/utils/misc';
 import { isCustomTranslatorAllowed } from '@/utils/access';
 import { navigateToLogin, navigateToProfile } from '@/utils/nav';
@@ -414,7 +415,7 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convertChineseVariant]);
 
-  if (showCustomDictionaries) {
+  if (showCustomDictionaries && (UI_FEATURES.dictionary || UI_FEATURES.wikipedia)) {
     return (
       <div className='my-4 w-full'>
         <CustomDictionaries onBack={() => setShowCustomDictionaries(false)} />
@@ -422,7 +423,7 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     );
   }
 
-  if (showCustomTranslators) {
+  if (showCustomTranslators && UI_FEATURES.translation) {
     return (
       <div className='w-full'>
         <CustomTranslators
@@ -433,7 +434,7 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     );
   }
 
-  if (showWordLens) {
+  if (showWordLens && (UI_FEATURES.dictionary || UI_FEATURES.wikipedia)) {
     return <WordLensPanel bookKey={bookKey} onBack={() => setShowWordLens(false)} />;
   }
 
@@ -450,144 +451,167 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
         </SettingsRow>
       </BoxedList>
 
-      <BoxedList
-        title={_('Dictionaries')}
-        data-setting-id='settings.language.dictionaries'
-        cardClassName='overflow-hidden'
-      >
-        <NavigationRow
-          title={_('Manage Dictionaries')}
-          onClick={() => setShowCustomDictionaries(true)}
-          className='h-14'
-        />
-      </BoxedList>
+      {(UI_FEATURES.dictionary || UI_FEATURES.wikipedia) && (
+        <BoxedList
+          title={_('Dictionaries')}
+          data-setting-id='settings.language.dictionaries'
+          cardClassName='overflow-hidden'
+        >
+          <NavigationRow
+            title={_('Manage Dictionaries')}
+            onClick={() => setShowCustomDictionaries(true)}
+            className='h-14'
+          />
+        </BoxedList>
+      )}
 
-      <BoxedList
-        title={_('Word Lens')}
-        data-setting-id='settings.language.wordlens'
-        cardClassName='overflow-hidden'
-      >
-        <NavigationRow
-          icon={PiTranslate}
+      {(UI_FEATURES.dictionary || UI_FEATURES.wikipedia) && (
+        <BoxedList
           title={_('Word Lens')}
-          status={_('Show a short native-language hint above difficult words.')}
-          onClick={() => setShowWordLens(true)}
-        />
-      </BoxedList>
-
-      <BoxedList title={_('Translation')} data-setting-id='settings.language.translationEnabled'>
-        <SettingsSwitchRow
-          label={_('Enable Translation')}
-          description={
-            bookKey && !translationAvailable ? _('Not available for this book.') : undefined
-          }
-          checked={translationEnabled}
-          onChange={() => setTranslationEnabled(!translationEnabled)}
-          disabled={!bookKey || (!translationAvailable && !translationEnabled)}
-        />
-        <SettingsSwitchRow
-          label={_('Show Source Text')}
-          checked={showTranslateSource}
-          onChange={() => setShowTranslateSource(!showTranslateSource)}
-        />
-        <SettingsRow label={_('TTS Text')} data-setting-id='settings.language.ttsTextTranslation'>
-          <SettingsSelect
-            value={ttsReadAloudText}
-            onChange={handleSelectTTSText}
-            ariaLabel={_('TTS Text')}
-            options={getTTSTextOptions()}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label={_('Translation Service')}
-          data-setting-id='settings.language.translationProvider'
+          data-setting-id='settings.language.wordlens'
+          cardClassName='overflow-hidden'
         >
-          <SettingsSelect
-            value={getCurrentTranslationProviderOption().value}
-            onChange={handleSelectTranslationProvider}
-            ariaLabel={_('Translation Service')}
-            options={getTranslationProviderOptions()}
+          <NavigationRow
+            icon={PiTranslate}
+            title={_('Word Lens')}
+            status={_('Show a short native-language hint above difficult words.')}
+            onClick={() => setShowWordLens(true)}
           />
-        </SettingsRow>
-        {isLLMProvider && (
-          <SettingsRow label={_('Prompt')} data-setting-id='settings.language.translationPrompt'>
-            <SettingsSelect
-              value={translationPromptId}
-              onChange={handleSelectPrompt}
-              ariaLabel={_('Prompt')}
-              options={getPromptOptions()}
+        </BoxedList>
+      )}
+
+      {UI_FEATURES.translation ? (
+        <>
+          <BoxedList
+            title={_('Translation')}
+            data-setting-id='settings.language.translationEnabled'
+          >
+            <SettingsSwitchRow
+              label={_('Enable Translation')}
+              description={
+                bookKey && !translationAvailable ? _('Not available for this book.') : undefined
+              }
+              checked={translationEnabled}
+              onChange={() => setTranslationEnabled(!translationEnabled)}
+              disabled={!bookKey || (!translationAvailable && !translationEnabled)}
             />
-          </SettingsRow>
-        )}
-        <SettingsRow label={_('Translate To')} data-setting-id='settings.language.targetLanguage'>
-          <SettingsSelect
-            value={getCurrentTargetLangOption().value}
-            onChange={handleSelectTargetLang}
-            ariaLabel={_('Translate To')}
-            options={getLangOptions(TRANSLATOR_LANGS)}
-          />
-        </SettingsRow>
-        <NavigationRow
-          title={_('Custom Translators')}
-          badge={hasPremium ? undefined : _('Premium')}
-          onClick={handleOpenCustomTranslators}
-          data-setting-id='settings.language.customTranslators'
-        />
-      </BoxedList>
-
-      <BoxedList title={_('Translated Text')} data-setting-id='settings.language.translatedText'>
-        <SettingsRow label={_('Font')}>
-          <SettingsSelect
-            value={translationFont}
-            onChange={(e) => setTranslationFont(e.target.value)}
-            ariaLabel={_('Font')}
-            options={translationFontOptions}
-          />
-        </SettingsRow>
-        <SettingsRow label={_('Font Style')}>
-          <SettingsSelect
-            value={translationFontStyle}
-            onChange={(e) => setTranslationFontStyle(e.target.value)}
-            ariaLabel={_('Font Style')}
-            options={translationFontStyleOptions}
-          />
-        </SettingsRow>
-        <SettingsRow label={_('Font Size')}>
-          <SettingsSelect
-            value={String(translationFontSize)}
-            onChange={(e) => setTranslationFontSize(Number(e.target.value) || 1)}
-            ariaLabel={_('Font Size')}
-            options={translationFontSizeOptions}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label={_('Text Color')}
-          description={translationColor ? translationColor : _('Default')}
-        >
-          <div className='flex items-center gap-2'>
-            {translationColor && (
-              <button
-                type='button'
-                onClick={() => setTranslationColor('')}
-                className='btn btn-ghost btn-xs eink-bordered shrink-0'
+            <SettingsSwitchRow
+              label={_('Show Source Text')}
+              checked={showTranslateSource}
+              onChange={() => setShowTranslateSource(!showTranslateSource)}
+            />
+            <SettingsRow
+              label={_('TTS Text')}
+              data-setting-id='settings.language.ttsTextTranslation'
+            >
+              <SettingsSelect
+                value={ttsReadAloudText}
+                onChange={handleSelectTTSText}
+                ariaLabel={_('TTS Text')}
+                options={getTTSTextOptions()}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={_('Translation Service')}
+              data-setting-id='settings.language.translationProvider'
+            >
+              <SettingsSelect
+                value={getCurrentTranslationProviderOption().value}
+                onChange={handleSelectTranslationProvider}
+                ariaLabel={_('Translation Service')}
+                options={getTranslationProviderOptions()}
+              />
+            </SettingsRow>
+            {isLLMProvider && (
+              <SettingsRow
+                label={_('Prompt')}
+                data-setting-id='settings.language.translationPrompt'
               >
-                {_('Default')}
-              </button>
+                <SettingsSelect
+                  value={translationPromptId}
+                  onChange={handleSelectPrompt}
+                  ariaLabel={_('Prompt')}
+                  options={getPromptOptions()}
+                />
+              </SettingsRow>
             )}
-            <ColorInput
-              label={_('Text Color')}
-              value={colorDraft ?? (translationColor || '#808080')}
-              onChange={setColorDraft}
-              onCommit={() => {
-                if (colorDraft) setTranslationColor(colorDraft);
-                setColorDraft(null);
-              }}
-              showPickerIcon
-              pickerPosition='right'
+            <SettingsRow
+              label={_('Translate To')}
+              data-setting-id='settings.language.targetLanguage'
+            >
+              <SettingsSelect
+                value={getCurrentTargetLangOption().value}
+                onChange={handleSelectTargetLang}
+                ariaLabel={_('Translate To')}
+                options={getLangOptions(TRANSLATOR_LANGS)}
+              />
+            </SettingsRow>
+            <NavigationRow
+              title={_('Custom Translators')}
+              badge={hasPremium ? undefined : _('Premium')}
+              onClick={handleOpenCustomTranslators}
+              data-setting-id='settings.language.customTranslators'
             />
-          </div>
-        </SettingsRow>
-      </BoxedList>
+          </BoxedList>
+
+          <BoxedList
+            title={_('Translated Text')}
+            data-setting-id='settings.language.translatedText'
+          >
+            <SettingsRow label={_('Font')}>
+              <SettingsSelect
+                value={translationFont}
+                onChange={(e) => setTranslationFont(e.target.value)}
+                ariaLabel={_('Font')}
+                options={translationFontOptions}
+              />
+            </SettingsRow>
+            <SettingsRow label={_('Font Style')}>
+              <SettingsSelect
+                value={translationFontStyle}
+                onChange={(e) => setTranslationFontStyle(e.target.value)}
+                ariaLabel={_('Font Style')}
+                options={translationFontStyleOptions}
+              />
+            </SettingsRow>
+            <SettingsRow label={_('Font Size')}>
+              <SettingsSelect
+                value={String(translationFontSize)}
+                onChange={(e) => setTranslationFontSize(Number(e.target.value) || 1)}
+                ariaLabel={_('Font Size')}
+                options={translationFontSizeOptions}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={_('Text Color')}
+              description={translationColor ? translationColor : _('Default')}
+            >
+              <div className='flex items-center gap-2'>
+                {translationColor && (
+                  <button
+                    type='button'
+                    onClick={() => setTranslationColor('')}
+                    className='btn btn-ghost btn-xs eink-bordered shrink-0'
+                  >
+                    {_('Default')}
+                  </button>
+                )}
+                <ColorInput
+                  label={_('Text Color')}
+                  value={colorDraft ?? (translationColor || '#808080')}
+                  onChange={setColorDraft}
+                  onCommit={() => {
+                    if (colorDraft) setTranslationColor(colorDraft);
+                    setColorDraft(null);
+                  }}
+                  showPickerIcon
+                  pickerPosition='right'
+                />
+              </div>
+            </SettingsRow>
+          </BoxedList>
+        </>
+      ) : null}
 
       {(isCJKEnv() || view?.language.isCJK) && (
         <BoxedList title={_('Punctuation')} data-setting-id='settings.language.quotationMarks'>

@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { MdLanguage, MdMenuBook, MdRssFeed } from 'react-icons/md';
 import { LuLibrary } from 'react-icons/lu';
 import { IoFileTray } from 'react-icons/io5';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import MenuItem from '@/components/MenuItem';
@@ -101,11 +102,13 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
         Icon={<MdRssFeed className='h-5 w-5' />}
         onClick={handleOpenFeeds}
       />
-      <MenuItem
-        label={appService?.isOnlineCatalogsAccessible ? _('Online Library') : _('OPDS Catalogs')}
-        Icon={<LuLibrary className='h-5 w-5' />}
-        onClick={handleOpenCatalogManager}
-      />
+      {UI_FEATURES.opds && (
+        <MenuItem
+          label={appService?.isOnlineCatalogsAccessible ? _('Online Library') : _('OPDS Catalogs')}
+          Icon={<LuLibrary className='h-5 w-5' />}
+          onClick={handleOpenCatalogManager}
+        />
+      )}
     </Menu>
   );
 };

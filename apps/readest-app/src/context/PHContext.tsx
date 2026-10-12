@@ -3,6 +3,7 @@
 import posthog from 'posthog-js';
 import { ReactNode } from 'react';
 import { PostHogProvider } from 'posthog-js/react';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { applyPostHogConsent, getTelemetryDecision } from '@/utils/telemetry';
 import { getAppVersion } from '@/utils/version';
 
@@ -22,6 +23,7 @@ let initialized = false;
  * file is loaded and `reconcileTelemetryConsent` has run (issue #6422).
  */
 export const initPostHog = () => {
+  if (!UI_FEATURES.telemetry) return;
   if (
     initialized ||
     typeof window === 'undefined' ||

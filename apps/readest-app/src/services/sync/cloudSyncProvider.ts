@@ -1,5 +1,6 @@
 import type { SystemSettings } from '@/types/settings';
 import type { UserPlan } from '@/types/quota';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { isCloudSyncAllowed } from '@/utils/access';
 import type { FileSyncBackendKind } from '@/services/sync/file/providerRegistry';
 
@@ -68,7 +69,7 @@ export const hasAnyThirdPartyEnabled = (settings: SystemSettings | null | undefi
  * wins.
  */
 export const isReadestCloudEnabled = (settings: SystemSettings | null | undefined): boolean =>
-  settings?.readestCloud?.enabled ?? !hasAnyThirdPartyEnabled(settings);
+  UI_FEATURES.auth && (settings?.readestCloud?.enabled ?? !hasAnyThirdPartyEnabled(settings));
 
 /** Every provider syncing the library on this device, Readest Cloud first. */
 export const getCloudSyncProviders = (
@@ -145,6 +146,7 @@ export const getActiveFileSyncBackends = (
   settings: SystemSettings | null | undefined,
   plan?: UserPlan,
 ): FileSyncBackendKind[] => {
+  if (!UI_FEATURES.auth) return [];
   const gate = resolveCloudSyncGate(settings, plan);
   return gate.paused ? [] : gate.backends;
 };

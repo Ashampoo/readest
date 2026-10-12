@@ -8,6 +8,7 @@ import {
   getPageProgressionRTL,
 } from '@/libs/document';
 import { BOOK_IDS_SEPARATOR } from '@/services/constants';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { BookConfig, PageInfo, ViewSettings } from '@/types/book';
 import { FoliateView, wrappedFoliateView } from '@/types/view';
 import { Insets } from '@/types/misc';
@@ -1230,7 +1231,7 @@ const FoliateViewer: React.FC<{
           <Spinner loading={true} />
         </div>
       )}
-      {syncState === 'conflict' && conflictDetails && (
+      {UI_FEATURES.kosync && syncState === 'conflict' && conflictDetails && (
         <KOSyncConflictResolver
           details={conflictDetails}
           onResolveWithLocal={resolveWithLocal}
@@ -1238,14 +1239,16 @@ const FoliateViewer: React.FC<{
           onClose={resolveWithLocal}
         />
       )}
-      {bookOrbitSync.syncState === 'conflict' && bookOrbitSync.conflictDetails && (
-        <KOSyncConflictResolver
-          details={bookOrbitSync.conflictDetails}
-          onResolveWithLocal={bookOrbitSync.resolveWithLocal}
-          onResolveWithRemote={bookOrbitSync.resolveWithRemote}
-          onClose={bookOrbitSync.resolveWithLocal}
-        />
-      )}
+      {UI_FEATURES.kosync &&
+        bookOrbitSync.syncState === 'conflict' &&
+        bookOrbitSync.conflictDetails && (
+          <KOSyncConflictResolver
+            details={bookOrbitSync.conflictDetails}
+            onResolveWithLocal={bookOrbitSync.resolveWithLocal}
+            onResolveWithRemote={bookOrbitSync.resolveWithRemote}
+            onClose={bookOrbitSync.resolveWithLocal}
+          />
+        )}
     </>
   );
 };

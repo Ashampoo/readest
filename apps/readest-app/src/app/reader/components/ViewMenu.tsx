@@ -29,6 +29,7 @@ import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { UI_FEATURES } from '@/services/featureFlags';
 import { useCloudSyncStatus } from '@/hooks/useCloudSyncStatus';
 import { getStyles } from '@/utils/style';
 import { navigateToLogin } from '@/utils/nav';
@@ -547,40 +548,42 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
-      <MenuItem
-        label={syncStatus.label}
-        description={
-          // Which provider the status belongs to. Only worth saying when a
-          // third-party backend is in play — with Readest Cloud alone the row
-          // means what it always meant.
-          syncStatus.providers.length > 1
-            ? // Several names in full would overrun the row; show a count.
-              // `count` (not a plain var) so i18next applies each locale's
-              // plural rule.
-              _('Synced via {{count}} providers', { count: syncStatus.providers.length })
-            : syncStatus.providers[0] && syncStatus.providers[0].kind !== 'readest'
-              ? _('Synced via {{provider}}', { provider: syncStatus.providers[0].name })
-              : undefined
-        }
-        Icon={syncStatus.needsSignIn || syncStatus.failed ? MdSyncProblem : MdSync}
-        iconClassName={
-          syncStatus.syncing || (user && viewState?.syncing) ? 'animate-reverse-spin' : ''
-        }
-        onClick={handleSync}
-        siblings={
-          <button
-            aria-label={_('Sync Info')}
-            title={_('Sync Info')}
-            className='hover:bg-base-300 text-base-content/70 mx-1 rounded-md px-2'
-            onClick={() => {
-              setIsDropdownOpen?.(false);
-              onShowMetaHashDialog?.();
-            }}
-          >
-            <MdInfoOutline size={16} />
-          </button>
-        }
-      />
+      {(UI_FEATURES.auth || syncStatus.providers.length > 0) && (
+        <MenuItem
+          label={syncStatus.label}
+          description={
+            // Which provider the status belongs to. Only worth saying when a
+            // third-party backend is in play — with Readest Cloud alone the row
+            // means what it always meant.
+            syncStatus.providers.length > 1
+              ? // Several names in full would overrun the row; show a count.
+                // `count` (not a plain var) so i18next applies each locale's
+                // plural rule.
+                _('Synced via {{count}} providers', { count: syncStatus.providers.length })
+              : syncStatus.providers[0] && syncStatus.providers[0].kind !== 'readest'
+                ? _('Synced via {{provider}}', { provider: syncStatus.providers[0].name })
+                : undefined
+          }
+          Icon={syncStatus.needsSignIn || syncStatus.failed ? MdSyncProblem : MdSync}
+          iconClassName={
+            syncStatus.syncing || (user && viewState?.syncing) ? 'animate-reverse-spin' : ''
+          }
+          onClick={handleSync}
+          siblings={
+            <button
+              aria-label={_('Sync Info')}
+              title={_('Sync Info')}
+              className='hover:bg-base-300 text-base-content/70 mx-1 rounded-md px-2'
+              onClick={() => {
+                setIsDropdownOpen?.(false);
+                onShowMetaHashDialog?.();
+              }}
+            >
+              <MdInfoOutline size={16} />
+            </button>
+          }
+        />
+      )}
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
